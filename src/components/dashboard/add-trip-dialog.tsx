@@ -4,9 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -29,11 +27,9 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { toDateTimeLocalString } from '@/lib/utils';
 import type { Trip, ConfigItem, User } from '@/lib/types';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { doc, collection, query, orderBy } from 'firebase/firestore';
@@ -46,21 +42,29 @@ const formSchema = z.object({
   destination: z.string().min(1, 'El destino es obligatorio.'),
   notes: z.string().optional(),
   
-  startDate: z.date({ required_error: 'La fecha de inicio es obligatoria.' }),
+  startDate: z.string().refine(val => !isNaN(Date.parse(val)), { message: "Fecha de inicio inválida." }),
   startOdometer: z.coerce.number().min(1, 'El odómetro de inicio es obligatorio.'),
 
   status: z.enum(['active', 'completed']).default('active'),
   
-  endDate: z.date().optional(),
+  endDate: z.string().optional(),
   endOdometer: z.coerce.number().optional(),
 }).refine(data => {
   if (data.status === 'completed') {
-    return !!data.endDate && !!data.endOdometer;
+    return !!data.endDate && !isNaN(Date.parse(data.endDate)) && !!data.endOdometer;
   }
   return true;
 }, {
   message: "La fecha y odómetro de fin son obligatorios para completar un viaje.",
   path: ["endDate"],
+}).refine(data => {
+    if (data.status === 'completed' && data.endOdometer) {
+        return data.endOdometer >= data.startOdometer;
+    }
+    return true;
+}, {
+    message: "El odómetro final debe ser mayor o igual al inicial.",
+    path: ["endOdometer"],
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -94,6 +98,14 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
+    defaultValues: {
+        tripType: '',
+        destination: '',
+        notes: '',
+        startOdometer: lastOdometer || 0,
+        status: 'active',
+        endOdometer: lastOdometer || 0,
+    }
   });
   
   const { watch, reset, setValue } = form;
@@ -101,15 +113,16 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
 
   useEffect(() => {
     if (open) {
+      const now = toDateTimeLocalString(new Date());
       reset({
         tripType: trip?.tripType || '',
         destination: trip?.destination || '',
         notes: trip?.notes || '',
-        startDate: trip ? new Date(trip.startDate) : new Date(),
-        startOdometer: trip?.startOdometer || lastOdometer || undefined,
+        startDate: trip ? toDateTimeLocalString(new Date(trip.startDate)) : now,
+        startOdometer: trip?.startOdometer || lastOdometer || 0,
         status: trip?.status || 'active',
-        endDate: trip?.endDate ? new Date(trip.endDate) : new Date(),
-        endOdometer: trip?.endOdometer || lastOdometer || undefined,
+        endDate: trip?.endDate ? toDateTimeLocalString(new Date(trip.endDate)) : now,
+        endOdometer: trip?.endOdometer || lastOdometer || 0,
       });
     }
   }, [open, trip, reset, lastOdometer]);
@@ -131,7 +144,7 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
     const tripId = isEditing ? trip.id : doc(collection(firestore, '_')).id;
     const tripRef = doc(firestore, 'vehicles', vehicleId, 'trips', tripId);
     
-    const tripData: Omit<Trip, 'startDate' | 'endDate'> & { startDate: string, endDate?: string } = {
+    const tripData: Partial<Trip> & { id: string, vehicleId: string, userId: string, startDate: string } = {
         id: tripId,
         vehicleId,
         userId: authUser.uid,
@@ -140,10 +153,10 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         notes: values.notes,
         startOdometer: values.startOdometer,
         status: values.status,
-        startDate: values.startDate.toISOString(),
-        ...(values.status === 'completed' && {
+        startDate: new Date(values.startDate).toISOString(),
+        ...(values.status === 'completed' && values.endDate && values.endOdometer && {
             endOdometer: values.endOdometer,
-            endDate: values.endDate?.toISOString(),
+            endDate: new Date(values.endDate).toISOString(),
         }),
     };
 
@@ -228,12 +241,7 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
                           <FormItem><FormLabel>Odómetro Inicial</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} disabled={status === 'completed'} /></FormControl><FormMessage /></FormItem>
                       )} />
                       <FormField control={form.control} name="startDate" render={({ field }) => (
-                          <FormItem className="flex flex-col pt-2"><FormLabel>Fecha de Inicio</FormLabel><Popover><PopoverTrigger asChild>
-                          <FormControl><Button variant="outline" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={status === 'completed'}>
-                              {field.value ? format(field.value, "PPP", { locale: es }) : <span>Elige fecha</span>}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button></FormControl>
-                          </PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent></Popover><FormMessage /></FormItem>
+                          <FormItem><FormLabel>Fecha de Inicio</FormLabel><FormControl><Input type="datetime-local" {...field} disabled={status === 'completed'} /></FormControl><FormMessage /></FormItem>
                       )} />
                   </div>
 
@@ -245,12 +253,7 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
                               <FormItem><FormLabel>Odómetro Final</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                           )} />
                           <FormField control={form.control} name="endDate" render={({ field }) => (
-                              <FormItem className="flex flex-col pt-2"><FormLabel>Fecha de Fin</FormLabel><Popover><PopoverTrigger asChild>
-                              <FormControl><Button variant="outline" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                  {field.value ? format(field.value, "PPP", { locale: es }) : <span>Elige fecha</span>}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button></FormControl>
-                              </PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent></Popover><FormMessage /></FormItem>
+                             <FormItem><FormLabel>Fecha de Fin</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                       </div>
                     </div>

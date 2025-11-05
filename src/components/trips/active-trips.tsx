@@ -3,9 +3,9 @@
 import type { Trip } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Flag, Calendar, Gauge } from 'lucide-react';
+import { Flag, Calendar, Gauge } from 'lucide-react';
 import AddTripDialog from '@/components/dashboard/add-trip-dialog';
-import { formatDate } from '@/lib/utils';
+import { formatDateTime } from '@/lib/utils';
 
 interface ActiveTripsProps {
     trips: Trip[];
@@ -30,7 +30,7 @@ export default function ActiveTrips({ trips, vehicleId, lastOdometer }: ActiveTr
               <div className="flex-1">
                 <p className="font-semibold text-lg">{trip.tripType}: {trip.destination}</p>
                 <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
-                    <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4" /> Inició: {formatDate(trip.startDate)}</span>
+                    <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4" /> Inició: {formatDateTime(trip.startDate)}</span>
                     <span className="flex items-center gap-1.5"><Gauge className="h-4 w-4" /> Odóm. Inicial: {trip.startOdometer.toLocaleString()} km</span>
                 </div>
               </div>

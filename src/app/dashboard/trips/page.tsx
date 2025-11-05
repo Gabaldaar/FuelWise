@@ -1,11 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { Trip, ProcessedFuelLog } from '@/lib/types';
+import type { Trip, ProcessedFuelLog, Vehicle } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Route, Loader2 } from 'lucide-react';
 import AddTripDialog from '@/components/dashboard/add-trip-dialog';
@@ -89,7 +88,7 @@ export default function TripsPage() {
       ) : (
         <div className="space-y-8">
             <ActiveTrips trips={activeTrips} vehicleId={vehicle.id} lastOdometer={lastOdometer} />
-            <CompletedTrips trips={completedTrips} vehicleId={vehicle.id} allFuelLogs={fuelLogs || []} />
+            <CompletedTrips trips={completedTrips} vehicle={vehicle as Vehicle} allFuelLogs={fuelLogs || []} />
 
             {trips?.length === 0 && (
                 <div className="h-64 text-center flex flex-col items-center justify-center rounded-lg border-2 border-dashed">

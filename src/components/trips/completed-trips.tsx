@@ -1,10 +1,10 @@
 'use client';
 
-import type { Trip, ProcessedFuelLog } from '@/lib/types';
+import type { Trip, ProcessedFuelLog, Vehicle } from '@/lib/types';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Map, Calendar, Gauge, Info, Edit, Trash2, Clock } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+import { Map, Edit, Trash2, Clock, Droplets, Wallet, Route, CircleDollarSign } from 'lucide-react';
+import { formatDateTime } from '@/lib/utils';
 import AddTripDialog from '../dashboard/add-trip-dialog';
 import { Button } from '../ui/button';
 import { useMemo } from 'react';
@@ -13,26 +13,32 @@ import { usePreferences } from '@/context/preferences-context';
 
 interface CompletedTripsProps {
     trips: Trip[];
-    vehicleId: string;
+    vehicle: Vehicle;
     allFuelLogs: ProcessedFuelLog[];
 }
 
-function TripDetails({ trip, fuelLogsForTrip }: { trip: Trip, fuelLogsForTrip: ProcessedFuelLog[] }) {
+function TripDetails({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehicle, allFuelLogs: ProcessedFuelLog[] }) {
     const { getFormattedConsumption, consumptionUnit } = usePreferences();
     const kmTraveled = trip.endOdometer && trip.startOdometer ? trip.endOdometer - trip.startOdometer : 0;
     
     const {
         fuelConsumed,
         totalCost,
-        avgConsumption,
+        avgConsumptionForTrip,
         costPerKm,
         duration
     } = useMemo(() => {
-        const fuelConsumed = fuelLogsForTrip.reduce((acc, log) => acc + log.liters, 0);
-        const totalCost = fuelLogsForTrip.reduce((acc, log) => acc + log.totalCost, 0);
+        if (kmTraveled <= 0) return { fuelConsumed: 0, totalCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A" };
+
+        const sortedLogs = [...allFuelLogs].sort((a, b) => a.odometer - b.odometer);
+        const avgPricePerLiter = sortedLogs.length > 0 ? sortedLogs.reduce((acc, log) => acc + log.pricePerLiter, 0) / sortedLogs.length : 0;
         
-        const avgConsumption = kmTraveled > 0 && fuelConsumed > 0 ? (kmTraveled / fuelConsumed) : 0;
-        const costPerKm = kmTraveled > 0 && totalCost > 0 ? (totalCost / kmTraveled) : 0;
+        const vehicleAvgConsumption = vehicle.averageConsumptionKmPerLiter;
+        if (vehicleAvgConsumption <= 0) return { fuelConsumed: 0, totalCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A" };
+
+        const fuelConsumed = kmTraveled / vehicleAvgConsumption;
+        const totalCost = fuelConsumed * avgPricePerLiter;
+        const costPerKm = totalCost / kmTraveled;
 
         let duration = "N/A";
         if (trip.endDate && trip.startDate) {
@@ -44,33 +50,45 @@ function TripDetails({ trip, fuelLogsForTrip }: { trip: Trip, fuelLogsForTrip: P
         return {
             fuelConsumed,
             totalCost,
-            avgConsumption,
+            avgConsumptionForTrip: vehicleAvgConsumption,
             costPerKm,
             duration
         }
-    }, [trip, fuelLogsForTrip, kmTraveled]);
+    }, [trip, allFuelLogs, kmTraveled, vehicle.averageConsumptionKmPerLiter]);
 
 
     return (
         <div className="space-y-3 pt-4 border-t pl-12">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                    <p className="font-medium">{fuelConsumed.toFixed(2)} L</p>
-                    <p className="text-xs text-muted-foreground">Combustible Consumido</p>
+                <div className="flex items-center gap-2">
+                    <Droplets className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                        <p className="font-medium">{fuelConsumed.toFixed(2)} L</p>
+                        <p className="text-xs text-muted-foreground">Combustible (Est.)</p>
+                    </div>
                 </div>
-                <div>
-                    <p className="font-medium">${totalCost.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">Costo Total</p>
+                 <div className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                        <p className="font-medium">${totalCost.toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">Costo Total (Est.)</p>
+                    </div>
                 </div>
-                <div>
-                    <p className="font-medium">{getFormattedConsumption(avgConsumption)}</p>
-                    <p className="text-xs text-muted-foreground">Consumo ({consumptionUnit})</p>
+                 <div className="flex items-center gap-2">
+                    <Route className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                        <p className="font-medium">{getFormattedConsumption(avgConsumptionForTrip)}</p>
+                        <p className="text-xs text-muted-foreground">Consumo ({consumptionUnit})</p>
+                    </div>
                 </div>
-                 <div>
-                    <p className="font-medium">${costPerKm.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">Costo / Km</p>
+                 <div className="flex items-center gap-2">
+                    <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                        <p className="font-medium">${costPerKm.toFixed(3)}</p>
+                        <p className="text-xs text-muted-foreground">Costo / Km</p>
+                    </div>
                 </div>
-                 <div className="flex items-center gap-1.5">
+                 <div className="flex items-center gap-2">
                      <Clock className="h-4 w-4 text-muted-foreground" />
                      <div>
                         <p className="font-medium">{duration}</p>
@@ -80,8 +98,8 @@ function TripDetails({ trip, fuelLogsForTrip }: { trip: Trip, fuelLogsForTrip: P
             </div>
              {trip.notes && (
                 <div className="pt-2 text-sm">
-                    <p className="font-medium flex items-center gap-2"><Info className="h-4 w-4"/> Notas</p>
-                    <p className="text-muted-foreground italic pl-6">{trip.notes}</p>
+                    <p className="font-medium">Notas:</p>
+                    <p className="text-muted-foreground italic">{trip.notes}</p>
                 </div>
             )}
              <div className="flex gap-2 pt-4">
@@ -99,14 +117,9 @@ function TripDetails({ trip, fuelLogsForTrip }: { trip: Trip, fuelLogsForTrip: P
 }
 
 
-export default function CompletedTrips({ trips, vehicleId, allFuelLogs }: CompletedTripsProps) {
+export default function CompletedTrips({ trips, vehicle, allFuelLogs }: CompletedTripsProps) {
   if (trips.length === 0) {
     return null;
-  }
-  
-  const getFuelLogsForTrip = (trip: Trip) => {
-    if (!trip.startOdometer || !trip.endOdometer) return [];
-    return allFuelLogs.filter(log => log.odometer > trip.startOdometer! && log.odometer <= trip.endOdometer!);
   }
 
   return (
@@ -124,7 +137,7 @@ export default function CompletedTrips({ trips, vehicleId, allFuelLogs }: Comple
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold">{trip.tripType}: {trip.destination}</p>
                     <p className="text-sm text-muted-foreground truncate">
-                      {formatDate(trip.startDate)} - {trip.endDate ? formatDate(trip.endDate) : ''}
+                      {formatDateTime(trip.startDate)}
                     </p>
                   </div>
                   <div className="text-right">
@@ -136,7 +149,7 @@ export default function CompletedTrips({ trips, vehicleId, allFuelLogs }: Comple
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-6 pb-4">
-                <TripDetails trip={trip} fuelLogsForTrip={getFuelLogsForTrip(trip)} />
+                <TripDetails trip={trip} vehicle={vehicle} allFuelLogs={allFuelLogs} />
               </AccordionContent>
             </AccordionItem>
           ))}

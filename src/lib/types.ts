@@ -53,9 +53,9 @@ export type Trip = {
     tripType: string;
     destination: string;
     notes?: string;
-    startDate: string;
+    startDate: string; // ISO datetime string
     startOdometer: number;
-    endDate?: string;
+    endDate?: string; // ISO datetime string
     endOdometer?: number;
     status: 'active' | 'completed';
 };
