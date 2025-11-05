@@ -1,19 +1,15 @@
 
 'use client';
 
-import type { Metadata } from 'next';
 import Image from 'next/image';
 import { useState } from 'react';
 import { vehicles as initialVehicles } from '@/lib/data';
 import type { Vehicle } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Car, Fuel, Gauge } from 'lucide-react';
+import { Car, Fuel, Gauge, Trash2 } from 'lucide-react';
 import AddVehicleDialog from '@/components/dashboard/add-vehicle-dialog';
-
-// export const metadata: Metadata = {
-//   title: 'Mis Vehículos - FuelWise',
-// };
+import DeleteVehicleDialog from '@/components/dashboard/delete-vehicle-dialog';
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
@@ -25,6 +21,10 @@ export default function VehiclesPage() {
     } else {
       setVehicles([...vehicles, vehicle]);
     }
+  };
+
+  const handleVehicleDelete = (vehicleId: string) => {
+    setVehicles(vehicles.filter(v => v.id !== vehicleId));
   };
 
   return (
@@ -67,13 +67,19 @@ export default function VehiclesPage() {
                             </div>
                         </div>
                     </CardContent>
-                    <CardFooter>
+                    <CardFooter className="flex gap-2">
                         <AddVehicleDialog vehicle={vehicle} onVehicleUpdate={handleVehicleUpdate}>
                             <Button variant="outline" className="w-full">
                                 <Car className='mr-2' />
-                                Gestionar Vehículo
+                                Gestionar
                             </Button>
                         </AddVehicleDialog>
+                        <DeleteVehicleDialog vehicle={vehicle} onVehicleDelete={handleVehicleDelete}>
+                            <Button variant="destructive" className="w-full">
+                                <Trash2 className='mr-2' />
+                                Eliminar
+                            </Button>
+                        </DeleteVehicleDialog>
                     </CardFooter>
                 </Card>
             ))}
