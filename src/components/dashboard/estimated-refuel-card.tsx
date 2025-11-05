@@ -1,6 +1,6 @@
 'use client';
 
-import { GasStation, Loader2, Calendar, Gauge } from 'lucide-react';
+import { Fuel, Loader2, Calendar, Gauge } from 'lucide-react';
 import type { EstimateFuelStopOutput } from '@/ai/flows/estimate-fuel-stop';
 import { formatDate } from '@/lib/utils';
 import { Card } from '../ui/card';
@@ -18,7 +18,7 @@ export default function EstimatedRefuelCard({ estimate, isLoading }: EstimatedRe
           {isLoading ? (
             <Loader2 className="h-8 w-8 flex-shrink-0 text-blue-500/80 animate-spin" />
           ) : (
-            <GasStation className="h-8 w-8 flex-shrink-0 text-blue-500/80" />
+            <Fuel className="h-8 w-8 flex-shrink-0 text-blue-500/80" />
           )}
 
           <div className="flex-1 min-w-0">
