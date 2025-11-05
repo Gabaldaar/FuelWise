@@ -14,35 +14,15 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Allow any authenticated user to read/write their own user profile.
+    // Allow any authenticated user to read and write anywhere.
+    // This is a temporary diagnostic step.
+    match /{document=**} {
+      allow read, write: if isSignedIn();
+    }
+
+    // User profiles are still protected. This rule is more specific, so it takes precedence.
     match /users/{userId} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
-    }
-    
-    // Allow any authenticated user to manage vehicles and their sub-collections.
-    match /vehicles/{vehicleId} {
-      // Any signed-in user can read and write vehicle documents and their subcollections.
-      allow read, write: if isSignedIn();
-
-      // Explicitly allow read/write on subcollections as well for clarity and ensuring permission propagation
-      match /fuel_records/{fuelRecordId} {
-        allow read, write: if isSignedIn();
-      }
-
-      match /service_reminders/{serviceReminderId} {
-        allow read, write: if isSignedIn();
-      }
-    }
-    
-    // Configuration collections are now top-level and shared.
-    match /fuel_types/{fuelTypeId} {
-      allow read, write: if isSignedIn();
-    }
-    match /service_types/{serviceTypeId} {
-      allow read, write: if isSignedIn();
-    }
-    match /gas_stations/{gasStationId} {
-      allow read, write: if isSignedIn();
     }
   }
 }
