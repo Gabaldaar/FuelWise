@@ -24,7 +24,8 @@ import {
   AlertTriangle,
   Map,
   Clock,
-  Wallet
+  Wallet,
+  Droplets
 } from 'lucide-react';
 import { formatDate, formatDateTime } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -544,3 +545,5 @@ function TripItemContent({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: 
     </>
   )
 }
+
+    
