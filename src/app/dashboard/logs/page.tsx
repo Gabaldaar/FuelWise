@@ -94,30 +94,33 @@ export default function LogsPage() {
                   {processedLogs.map(log => (
                       <AccordionItem value={log.id} key={log.id}>
                           <AccordionTrigger className="px-6 py-4 text-left hover:no-underline">
-                              <div className="flex-1 flex flex-col sm:flex-row sm:justify-between sm:items-center">
-                                  <div className="flex-1">
-                                      <p className="font-semibold">{formatDate(log.date)}</p>
-                                      <p className="text-sm text-muted-foreground sm:hidden mt-1">${log.totalCost.toFixed(2)} por {log.liters.toFixed(2)}L</p>
-                                  </div>
-                                  <div className="hidden sm:flex items-center gap-6 text-sm text-right">
-                                      <div className="flex-1">
-                                          <p>${log.totalCost.toFixed(2)}</p>
-                                          <p className="text-muted-foreground text-xs">{log.liters.toFixed(2)} L</p>
-                                      </div>
-                                      <div className="w-24">
-                                          <p>{getFormattedConsumption(log.consumption)}</p>
-                                          <p className="text-muted-foreground text-xs">{consumptionUnit}</p>
-                                      </div>
-                                      <div className="w-24">
-                                          <p>{log.odometer.toLocaleString()} km</p>
-                                          <p className="text-muted-foreground text-xs">Odómetro</p>
-                                      </div>
-                                  </div>
+                            <div className="flex items-center gap-4">
+                                <Fuel className="h-8 w-8 flex-shrink-0 text-primary/80" />
+                                <div className="flex-1 flex flex-col sm:flex-row sm:justify-between sm:items-center">
+                                    <div className="flex-1">
+                                        <p className="font-semibold">{formatDate(log.date)}</p>
+                                        <p className="text-sm text-muted-foreground sm:hidden mt-1">${log.totalCost.toFixed(2)} por {log.liters.toFixed(2)}L</p>
+                                    </div>
+                                    <div className="hidden sm:flex items-center gap-6 text-sm text-right">
+                                        <div className="flex-1">
+                                            <p>${log.totalCost.toFixed(2)}</p>
+                                            <p className="text-muted-foreground text-xs">{log.liters.toFixed(2)} L</p>
+                                        </div>
+                                        <div className="w-24">
+                                            <p>{getFormattedConsumption(log.consumption)}</p>
+                                            <p className="text-muted-foreground text-xs">{consumptionUnit}</p>
+                                        </div>
+                                        <div className="w-24">
+                                            <p>{log.odometer.toLocaleString()} km</p>
+                                            <p className="text-muted-foreground text-xs">Odómetro</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {log.isFillUp && <Badge variant="secondary" className="ml-4 hidden sm:block">Lleno</Badge>}
                               </div>
-                              {log.isFillUp && <Badge variant="secondary" className="ml-4 hidden sm:block">Lleno</Badge>}
                           </AccordionTrigger>
                           <AccordionContent className="px-6 pb-4">
-                              <div className="space-y-3 pt-4 border-t">
+                              <div className="space-y-3 pt-4 border-t pl-12">
                                   <div className="sm:hidden grid grid-cols-2 gap-4 text-sm">
                                        <div>
                                           <p className="font-medium">{getFormattedConsumption(log.consumption)}</p>
