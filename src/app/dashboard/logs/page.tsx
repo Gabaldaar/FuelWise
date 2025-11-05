@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Edit, Trash2, Gauge, Droplets, Tag, Building, User as UserIcon } from 'lucide-react';
 import DeleteFuelLogDialog from '@/components/dashboard/delete-fuel-log-dialog';
+import { usePreferences } from '@/context/preferences-context';
 
 function processFuelLogs(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
   // Sort logs by date ascending to calculate consumption correctly
@@ -61,6 +62,7 @@ export default function LogsPage() {
   const { selectedVehicle: vehicle } = useVehicles();
   const { user } = useUser();
   const firestore = useFirestore();
+  const { consumptionUnit, getFormattedConsumption } = usePreferences();
 
   const fuelLogsQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
@@ -100,7 +102,7 @@ export default function LogsPage() {
                 <TableHead>Llenado</TableHead>
                 <TableHead>Costo Total</TableHead>
                 <TableHead>$/Litro</TableHead>
-                <TableHead>Km/L</TableHead>
+                <TableHead>{consumptionUnit}</TableHead>
                 <TableHead>Gasolinera</TableHead>
                 <TableHead>Conductor</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -120,7 +122,7 @@ export default function LogsPage() {
                     </TableCell>
                     <TableCell>${log.totalCost.toFixed(2)}</TableCell>
                     <TableCell>${log.pricePerLiter.toFixed(2)}</TableCell>
-                    <TableCell>{log.consumption ? `${log.consumption.toFixed(2)}` : 'N/A'}</TableCell>
+                    <TableCell>{getFormattedConsumption(log.consumption)}</TableCell>
                     <TableCell>{log.gasStation}</TableCell>
                     <TableCell>{log.username}</TableCell>
                     <TableCell className="text-right">
@@ -172,8 +174,8 @@ export default function LogsPage() {
                                         <span>{log.odometer.toLocaleString()} km</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="flex items-center gap-2 text-muted-foreground"><Droplets className="h-4 w-4" /> Km/L</span>
-                                        <span>{log.consumption ? `${log.consumption.toFixed(2)}` : 'N/A'}</span>
+                                        <span className="flex items-center gap-2 text-muted-foreground"><Droplets className="h-4 w-4" /> {consumptionUnit}</span>
+                                        <span>{getFormattedConsumption(log.consumption)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="flex items-center gap-2 text-muted-foreground"><Tag className="h-4 w-4" /> $/Litro</span>

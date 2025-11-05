@@ -17,7 +17,8 @@ import SettingsList from '@/components/settings/settings-list';
 import type { ConfigItem } from '@/lib/types';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import { Droplets, Wrench, Building } from 'lucide-react';
+import { Droplets, Wrench, Building, SlidersHorizontal } from 'lucide-react';
+import PreferencesSettings from '@/components/settings/preferences-settings';
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -54,11 +55,15 @@ export default function SettingsPage() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="fuel">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="preferences"><SlidersHorizontal className="mr-2" />Preferencias</TabsTrigger>
             <TabsTrigger value="fuel"><Droplets className="mr-2" />Combustibles</TabsTrigger>
             <TabsTrigger value="services"><Wrench className="mr-2" />Servicios</TabsTrigger>
             <TabsTrigger value="stations"><Building className="mr-2" />Gasolineras</TabsTrigger>
           </TabsList>
+          <TabsContent value="preferences">
+            <PreferencesSettings />
+          </TabsContent>
           <TabsContent value="fuel">
             <SettingsList
               title="Tipos de Combustible"

@@ -5,26 +5,29 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import type { ProcessedFuelLog } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 import { useMemo } from 'react';
+import { usePreferences } from '@/context/preferences-context';
 
 interface FuelConsumptionChartProps {
   data: ProcessedFuelLog[];
 }
 
 export default function FuelConsumptionChart({ data }: FuelConsumptionChartProps) {
+  const { consumptionUnit, getConsumptionValue } = usePreferences();
+  
   const chartData = useMemo(() => {
     return data
       .filter(log => log.consumption && log.consumption > 0)
       .map(log => ({
         date: formatDate(log.date),
-        'Km/L': log.consumption,
+        [consumptionUnit]: getConsumptionValue(log.consumption),
       }));
-  }, [data]);
+  }, [data, consumptionUnit, getConsumptionValue]);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="font-headline">Análisis de Consumo</CardTitle>
-        <CardDescription>Rendimiento de combustible (Km/L) por repostaje.</CardDescription>
+        <CardDescription>Rendimiento de combustible ({consumptionUnit}) por repostaje.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
@@ -42,7 +45,7 @@ export default function FuelConsumptionChart({ data }: FuelConsumptionChartProps
                 tick={{ fontSize: 12 }} 
                 tickLine={false} 
                 axisLine={false}
-                label={{ value: 'Km/L', angle: -90, position: 'insideLeft', offset: 0, style: { textAnchor: 'middle', fontSize: '12px' } }}
+                label={{ value: consumptionUnit, angle: -90, position: 'insideLeft', offset: 0, style: { textAnchor: 'middle', fontSize: '12px' } }}
               />
               <Tooltip
                 cursor={{ fill: 'hsl(var(--muted))' }}
@@ -52,7 +55,7 @@ export default function FuelConsumptionChart({ data }: FuelConsumptionChartProps
                   borderRadius: 'var(--radius)',
                 }}
               />
-              <Bar dataKey="Km/L" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={consumptionUnit} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (

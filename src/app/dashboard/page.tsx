@@ -13,6 +13,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { usePreferences } from '@/context/preferences-context';
 
 function processFuelLogs(logs: ProcessedFuelLog[], vehicle: { averageConsumptionKmPerLiter?: number }): { processedLogs: ProcessedFuelLog[], avgConsumption: number } {
   const sortedLogs = logs
@@ -52,6 +53,7 @@ export default function DashboardPage() {
   const { selectedVehicle: vehicle } = useVehicles();
   const { user } = useUser();
   const firestore = useFirestore();
+  const { consumptionUnit, getFormattedConsumption } = usePreferences();
 
   const fuelLogsQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
@@ -151,7 +153,7 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6">
       <WelcomeBanner vehicle={vehicleWithAvgConsumption} lastLog={vehicleFuelLogs[0]} />
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Consumo Promedio" value={`${avgConsumption.toFixed(2)} km/L`} />
+        <StatCard title="Consumo Promedio" value={getFormattedConsumption(avgConsumption)} description={consumptionUnit} />
         <StatCard title="Costo Total" value={`$${totalSpent.toFixed(2)}`} />
         <StatCard title="Litros Totales" value={`${totalLiters.toFixed(2)} L`} />
         <StatCard 

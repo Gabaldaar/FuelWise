@@ -1,4 +1,5 @@
 
+
 export type Vehicle = {
   id: string;
   make: string;
@@ -60,4 +61,5 @@ export type ConfigItem = {
   name: string;
 };
 
+export type ConsumptionUnit = 'km/L' | 'L/100km';
     

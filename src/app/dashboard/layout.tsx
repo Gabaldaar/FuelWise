@@ -8,6 +8,7 @@ import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { PreferencesProvider } from '@/context/preferences-context';
 
 function DashboardLayoutContent({
   children,
@@ -29,6 +30,7 @@ function DashboardLayoutContent({
   
   return (
     <VehicleProvider>
+      <PreferencesProvider>
         <SidebarProvider>
         <div className="min-h-screen">
             <Sidebar>
@@ -42,6 +44,7 @@ function DashboardLayoutContent({
             </SidebarInset>
         </div>
         </SidebarProvider>
+      </PreferencesProvider>
     </VehicleProvider>
   );
 }
