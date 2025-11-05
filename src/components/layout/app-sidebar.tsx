@@ -1,17 +1,26 @@
+
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Car, Fuel, LayoutDashboard, Leaf, Settings, Wrench } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Car, Fuel, LayoutDashboard, Leaf, LogOut, Settings, Wrench } from 'lucide-react';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { signOut } from 'firebase/auth';
+import type { User } from '@/lib/types';
+import { doc } from 'firebase/firestore';
 
 import {
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarSeparator,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { Button } from '../ui/button';
 
 const menuItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -20,6 +29,47 @@ const menuItems = [
   { href: '/dashboard/vehicles', label: 'Vehículos', icon: Car },
   { href: '/dashboard/settings', label: 'Configuración', icon: Settings },
 ];
+
+function UserInfo() {
+  const auth = useAuth();
+  const { user: authUser } = useUser();
+  const firestore = useFirestore();
+  const router = useRouter();
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!authUser) return null;
+    return doc(firestore, 'users', authUser.uid);
+  }, [firestore, authUser]);
+
+  const { data: userProfile } = useDoc<User>(userProfileRef);
+  
+  const handleSignOut = () => {
+    signOut(auth);
+    router.push('/login');
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  }
+
+  if (!authUser) return null;
+
+  return (
+    <div className='flex items-center gap-2'>
+      <Avatar className='h-8 w-8'>
+        <AvatarFallback>{getInitials(userProfile?.username)}</AvatarFallback>
+      </Avatar>
+      <div className='flex flex-col text-sm truncate'>
+        <span className='font-semibold text-sidebar-foreground truncate'>{userProfile?.username}</span>
+        <span className='text-xs text-muted-foreground truncate'>{authUser.email}</span>
+      </div>
+      <Button variant="ghost" size="icon" onClick={handleSignOut} title="Cerrar sesión" className='ml-auto'>
+        <LogOut className="h-4 w-4" />
+      </Button>
+    </div>
+  )
+}
 
 export default function AppSidebar() {
   const pathname = usePathname();
@@ -54,6 +104,10 @@ export default function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
+      <SidebarSeparator />
+      <SidebarFooter>
+        <UserInfo />
+      </SidebarFooter>
     </>
   );
 }
