@@ -41,10 +41,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { cn, formatDate } from '@/lib/utils';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, doc, query, orderBy } from 'firebase/firestore';
 import { addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import type { FuelLog, User, Vehicle } from '@/lib/types';
+import type { FuelLog, User, Vehicle, ConfigItem } from '@/lib/types';
 
 const formSchema = z.object({
   date: z.date({
@@ -54,7 +54,7 @@ const formSchema = z.object({
   totalCost: z.coerce.number().min(0.01, 'El costo total es obligatorio.'),
   liters: z.coerce.number().min(0.01, 'La cantidad de litros es obligatoria.'),
   pricePerLiter: z.coerce.number().min(0.01, 'El precio por litro es obligatorio.'),
-  fuelType: z.enum(['Gasolina', 'Diesel', 'Etanol'], {
+  fuelType: z.string({
     required_error: 'El tipo de combustible es obligatorio.',
   }),
   isFillUp: z.boolean().default(true),
@@ -90,6 +90,13 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
 
   const { data: userProfile } = useDoc<User>(userProfileRef);
 
+  const fuelTypesQuery = useMemoFirebase(() => {
+    if (!authUser) return null;
+    return query(collection(firestore, 'fuel_types'), orderBy('name'));
+  }, [firestore, authUser]);
+
+  const { data: fuelTypes, isLoading: isLoadingFuelTypes } = useCollection<ConfigItem>(fuelTypesQuery);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -98,7 +105,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
       totalCost: undefined,
       liters: undefined,
       pricePerLiter: undefined,
-      fuelType: vehicle?.defaultFuelType || 'Gasolina',
+      fuelType: vehicle?.defaultFuelType,
       isFillUp: true,
       gasStation: '',
     },
@@ -114,8 +121,8 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
       totalCost: isEditing && fuelLog ? fuelLog.totalCost : undefined,
       liters: isEditing && fuelLog ? fuelLog.liters : undefined,
       pricePerLiter: isEditing && fuelLog ? fuelLog.pricePerLiter : undefined,
-      fuelType: (isEditing && fuelLog?.fuelType) || vehicle?.defaultFuelType || 'Gasolina',
-      isFillUp: isEditing && fuelLog ? fuelLog.isFillUp : true,
+      fuelType: (isEditing && fuelLog?.fuelType) || vehicle?.defaultFuelType,
+      isFillUp: isEditing ? (fuelLog.isFillUp !== undefined ? fuelLog.isFillUp : true) : true,
       gasStation: isEditing && fuelLog ? fuelLog.gasStation : '',
     };
     form.reset(defaultVals);
@@ -325,14 +332,14 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
                     <FormLabel>Tipo de Combustible</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Selecciona un tipo" />
+                        <SelectTrigger disabled={isLoadingFuelTypes}>
+                            <SelectValue placeholder={isLoadingFuelTypes ? "Cargando..." : "Selecciona un tipo"} />
                         </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                        <SelectItem value="Gasolina">Gasolina</SelectItem>
-                        <SelectItem value="Diesel">Diesel</SelectItem>
-                        <SelectItem value="Etanol">Etanol</SelectItem>
+                          {fuelTypes?.map(fuelType => (
+                            <SelectItem key={fuelType.id} value={fuelType.name}>{fuelType.name}</SelectItem>
+                          ))}
                         </SelectContent>
                     </Select>
                     <FormMessage />

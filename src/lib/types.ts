@@ -1,3 +1,4 @@
+
 export type Vehicle = {
   id: string;
   make: string;
@@ -8,7 +9,7 @@ export type Vehicle = {
   averageConsumptionKmPerLiter: number;
   imageUrl: string;
   imageHint?: string;
-  defaultFuelType: 'Gasolina' | 'Diesel' | 'Etanol';
+  defaultFuelType?: string;
 };
 
 export type FuelLog = {
@@ -17,7 +18,7 @@ export type FuelLog = {
   userId: string;
   date: string; // ISO date string
   odometer: number;
-  fuelType: 'Gasolina' | 'Diesel' | 'Etanol';
+  fuelType: string;
   pricePerLiter: number;
   totalCost: number;
   liters: number;

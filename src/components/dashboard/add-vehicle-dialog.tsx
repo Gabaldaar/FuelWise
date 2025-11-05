@@ -27,9 +27,9 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import type { Vehicle } from '@/lib/types';
-import { useUser, useFirestore } from '@/firebase';
-import { doc, collection } from 'firebase/firestore';
+import type { Vehicle, ConfigItem } from '@/lib/types';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { doc, collection, query, orderBy } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
@@ -41,7 +41,7 @@ const formSchema = z.object({
   fuelCapacityLiters: z.coerce.number().min(1, 'La capacidad del tanque es obligatoria.'),
   averageConsumptionKmPerLiter: z.coerce.number().min(1, 'El consumo es obligatorio.'),
   imageUrl: z.string().url('URL de imagen inválida.').optional().or(z.literal('')),
-  defaultFuelType: z.enum(['Gasolina', 'Diesel', 'Etanol'], {
+  defaultFuelType: z.string({
     required_error: 'El tipo de combustible es obligatorio.',
   }),
 });
@@ -61,6 +61,13 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
   const firestore = useFirestore();
   const isEditing = !!vehicle;
 
+  const fuelTypesQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(firestore, 'fuel_types'), orderBy('name'));
+  }, [firestore, user]);
+
+  const { data: fuelTypes, isLoading: isLoadingFuelTypes } = useCollection<ConfigItem>(fuelTypesQuery);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -71,7 +78,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
       fuelCapacityLiters: vehicle?.fuelCapacityLiters,
       averageConsumptionKmPerLiter: vehicle?.averageConsumptionKmPerLiter,
       imageUrl: vehicle?.imageUrl || '',
-      defaultFuelType: vehicle?.defaultFuelType || 'Gasolina',
+      defaultFuelType: vehicle?.defaultFuelType,
     },
   });
 
@@ -116,7 +123,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
           fuelCapacityLiters: undefined,
           averageConsumptionKmPerLiter: undefined,
           imageUrl: '',
-          defaultFuelType: 'Gasolina',
+          defaultFuelType: undefined,
         });
     }
   }
@@ -208,14 +215,14 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
                   <FormLabel>Combustible por Defecto</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un tipo" />
+                      <SelectTrigger disabled={isLoadingFuelTypes}>
+                        <SelectValue placeholder={isLoadingFuelTypes ? "Cargando..." : "Selecciona un tipo"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="Gasolina">Gasolina</SelectItem>
-                      <SelectItem value="Diesel">Diesel</SelectItem>
-                      <SelectItem value="Etanol">Etanol</SelectItem>
+                      {fuelTypes?.map(fuelType => (
+                        <SelectItem key={fuelType.id} value={fuelType.name}>{fuelType.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
