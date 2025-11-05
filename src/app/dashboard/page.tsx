@@ -11,6 +11,7 @@ import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
 
 function processFuelLogs(logs: ProcessedFuelLog[], vehicle: { averageConsumptionKmPerLiter?: number }): { processedLogs: ProcessedFuelLog[], avgConsumption: number } {
   const sortedLogs = logs
@@ -118,6 +119,32 @@ export default function DashboardPage() {
 
   const nextService = sortedPendingReminders[0];
 
+  const getNextServiceValue = () => {
+    if (!nextService) return { value: 'N/A', description: 'Todo en orden' };
+    
+    if (nextService.dueDate && nextService.dueOdometer) {
+       return { 
+        value: formatDate(nextService.dueDate),
+        description: `o a los ${nextService.dueOdometer.toLocaleString()} km`
+      };
+    }
+    if (nextService.dueDate) {
+      return { 
+        value: formatDate(nextService.dueDate), 
+        description: nextService.serviceType 
+      };
+    }
+    if (nextService.dueOdometer) {
+      return { 
+        value: `${nextService.dueOdometer.toLocaleString()} km`, 
+        description: nextService.serviceType 
+      };
+    }
+    return { value: 'Revisar', description: nextService.serviceType };
+  };
+
+  const nextServiceInfo = getNextServiceValue();
+
   return (
     <div className="flex flex-col gap-6">
       <WelcomeBanner vehicle={vehicleWithAvgConsumption} lastLog={vehicleFuelLogs[0]} />
@@ -125,7 +152,11 @@ export default function DashboardPage() {
         <StatCard title="Consumo Promedio" value={`${avgConsumption.toFixed(2)} km/L`} />
         <StatCard title="Costo Total" value={`$${totalSpent.toFixed(2)}`} />
         <StatCard title="Litros Totales" value={`${totalLiters.toFixed(2)} L`} />
-        <StatCard title="Próximo Servicio" value={nextService?.serviceType || 'N/A'} />
+        <StatCard 
+          title="Próximo Servicio" 
+          value={nextServiceInfo.value}
+          description={nextServiceInfo.description}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
