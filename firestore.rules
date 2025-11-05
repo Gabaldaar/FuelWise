@@ -28,11 +28,13 @@ service cloud.firestore {
 
       match /fuel_records/{fuelRecordId} {
         // Any signed-in user can perform any action on fuel records.
+        // 'read' and 'write' are shorthand for get, list and create, update, delete.
         allow read, write: if isSignedIn();
       }
 
       match /service_reminders/{serviceReminderId} {
         // Any signed-in user can perform any action on service reminders.
+        // 'read' and 'write' are shorthand for get, list and create, update, delete.
         allow read, write: if isSignedIn();
       }
     }
