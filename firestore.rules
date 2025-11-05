@@ -1,5 +1,5 @@
 /**
- * @fileoverview Firestore Security Rules for FuelWise application.
+ * @fileoverview Firestore Security Rules for MotorLog application.
  *
  * Core Philosophy:
  * This ruleset allows any authenticated user to read and write data.

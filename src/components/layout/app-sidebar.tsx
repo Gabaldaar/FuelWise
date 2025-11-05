@@ -84,7 +84,7 @@ export default function AppSidebar() {
       <SidebarHeader>
         <div className="flex items-center gap-2">
             <Leaf className="size-6 text-primary" />
-            <h1 className="font-headline text-xl font-semibold">FuelWise</h1>
+            <h1 className="font-headline text-xl font-semibold">MotorLog</h1>
         </div>
       </SidebarHeader>
       <SidebarContent>

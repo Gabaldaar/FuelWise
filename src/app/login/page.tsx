@@ -71,7 +71,7 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <div className="flex justify-center items-center gap-2 mb-4">
             <Leaf className="size-8 text-primary" />
-            <h1 className="font-headline text-3xl font-semibold">FuelWise</h1>
+            <h1 className="font-headline text-3xl font-semibold">MotorLog</h1>
           </div>
           <CardTitle>Iniciar Sesión</CardTitle>
           <CardDescription>Ingresa a tu cuenta para gestionar tus vehículos.</CardDescription>

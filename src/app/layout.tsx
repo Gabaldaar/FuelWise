@@ -4,7 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'FuelWise',
+  title: 'MotorLog',
   description: 'Intelligent fuel and vehicle management',
 };
 

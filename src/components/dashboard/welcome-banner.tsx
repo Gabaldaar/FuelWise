@@ -62,7 +62,7 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
             <div className="flex-1 p-6">
                 <CardHeader className="p-0">
                     <CardTitle className="font-headline text-3xl">
-                        Bienvenido a FuelWise
+                        Bienvenido a MotorLog
                     </CardTitle>
                     <CardDescription className="text-base">
                         Gestionando tu {vehicle.make} {vehicle.model} ({vehicle.year})

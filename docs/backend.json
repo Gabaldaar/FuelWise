@@ -5,7 +5,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user of the FuelWise application.",
+      "description": "Represents a user of the MotorLog application.",
       "properties": {
         "id": {
           "type": "string",
@@ -31,7 +31,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Vehicle",
       "type": "object",
-      "description": "Represents a vehicle managed within the FuelWise application.",
+      "description": "Represents a vehicle managed within the MotorLog application.",
       "properties": {
         "id": {
           "type": "string",

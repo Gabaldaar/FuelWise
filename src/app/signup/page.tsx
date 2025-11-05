@@ -87,7 +87,7 @@ export default function SignupPage() {
         <CardHeader className="text-center">
            <div className="flex justify-center items-center gap-2 mb-4">
             <Leaf className="size-8 text-primary" />
-            <h1 className="font-headline text-3xl font-semibold">FuelWise</h1>
+            <h1 className="font-headline text-3xl font-semibold">MotorLog</h1>
           </div>
           <CardTitle>Crear Cuenta</CardTitle>
           <CardDescription>Regístrate para empezar a gestionar tus vehículos.</CardDescription>
