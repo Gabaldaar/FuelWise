@@ -1,7 +1,6 @@
 'use client';
 
 import type { Metadata } from 'next';
-import { fuelLogs } from '@/lib/data';
 import type { ProcessedFuelLog } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +14,8 @@ import {
 } from '@/components/ui/table';
 import { formatDate } from '@/lib/utils';
 import AddFuelLogDialog from '@/components/dashboard/add-fuel-log-dialog';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
 
 /*
 export const metadata: Metadata = {
@@ -22,12 +23,11 @@ export const metadata: Metadata = {
 };
 */
 
-function processFuelLogs(logs: typeof fuelLogs, vehicleId: string): ProcessedFuelLog[] {
-  const vehicleLogs = logs
-    .filter(log => log.vehicleId === vehicleId)
+function processFuelLogs(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
+  const sortedLogs = logs
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  return vehicleLogs.map((log, index, allLogs) => {
+  return sortedLogs.map((log, index, allLogs) => {
     const prevLog = allLogs[index + 1];
     if (!prevLog) return { ...log };
 
@@ -44,12 +44,24 @@ function processFuelLogs(logs: typeof fuelLogs, vehicleId: string): ProcessedFue
 
 export default function LogsPage() {
   const { selectedVehicle: vehicle } = useVehicles();
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const fuelLogsQuery = useMemoFirebase(() => {
+    if (!user || !vehicle) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'vehicles', vehicle.id, 'fuel_records'),
+      orderBy('date', 'desc')
+    );
+  }, [firestore, user, vehicle]);
+
+  const { data: fuelLogs, isLoading } = useCollection<ProcessedFuelLog>(fuelLogsQuery);
   
   if (!vehicle) {
     return <div className="text-center">Por favor, seleccione un vehículo.</div>;
   }
 
-  const processedLogs = processFuelLogs(fuelLogs, vehicle.id);
+  const processedLogs = fuelLogs ? processFuelLogs(fuelLogs) : [];
 
   return (
     <Card>
@@ -74,7 +86,9 @@ export default function LogsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {processedLogs.length > 0 ? (
+            {isLoading ? (
+                <TableRow><TableCell colSpan={7} className="h-24 text-center">Cargando registros...</TableCell></TableRow>
+            ) : processedLogs.length > 0 ? (
               processedLogs.map((log) => (
                 <TableRow key={log.id}>
                   <TableCell>{formatDate(log.date)}</TableCell>

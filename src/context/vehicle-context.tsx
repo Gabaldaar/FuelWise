@@ -3,80 +3,90 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { Vehicle } from '@/lib/types';
-import { initialVehicles } from '@/lib/data';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
 
 interface VehicleContextType {
   vehicles: Vehicle[];
   selectedVehicle: Vehicle | null;
   selectVehicle: (vehicleId: string) => void;
-  addVehicle: (vehicle: Vehicle) => void;
-  updateVehicle: (vehicle: Vehicle) => void;
-  deleteVehicle: (vehicleId: string) => void;
+  isLoading: boolean;
 }
 
 const VehicleContext = createContext<VehicleContextType | undefined>(undefined);
 
 export const VehicleProvider = ({ children }: { children: ReactNode }) => {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const vehiclesQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(firestore, 'users', user.uid, 'vehicles'), orderBy('make'));
+  }, [firestore, user]);
+
+  const { data: vehicles, isLoading } = useCollection<Vehicle>(vehiclesQuery);
+
   useEffect(() => {
+    if (isLoading || !vehicles) return;
+
     const currentVehicleId = searchParams.get('vehicle');
+    
+    // If there's a vehicle ID in the URL, try to select it
     if (currentVehicleId) {
-      const vehicle = vehicles.find(v => v.id === currentVehicleId) || null;
-      setSelectedVehicle(vehicle);
-    } else if (vehicles.length > 0) {
-      setSelectedVehicle(vehicles[0]);
-      // Update URL to reflect the default selected vehicle
-      const params = new URLSearchParams(searchParams);
-      params.set('vehicle', vehicles[0].id);
-      router.replace(`${pathname}?${params.toString()}`);
-    } else {
-        setSelectedVehicle(null);
+      const vehicleFromUrl = vehicles.find(v => v.id === currentVehicleId);
+      if (vehicleFromUrl) {
+        if (selectedVehicle?.id !== vehicleFromUrl.id) {
+          setSelectedVehicle(vehicleFromUrl);
+        }
+        return; 
+      }
     }
-  }, [searchParams, vehicles, pathname, router]);
+    
+    // If there's already a selected vehicle and it still exists in the list, do nothing
+    if(selectedVehicle && vehicles.some(v => v.id === selectedVehicle.id)) {
+        return;
+    }
+
+    // If no vehicle is selected (or selected one is gone), or no valid ID in URL
+    if (vehicles.length > 0) {
+      const vehicleToSelect = vehicles[0];
+      setSelectedVehicle(vehicleToSelect);
+      // Update URL only if it doesn't match
+      if (currentVehicleId !== vehicleToSelect.id) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('vehicle', vehicleToSelect.id);
+        router.replace(`${pathname}?${params.toString()}`);
+      }
+    } else {
+      // No vehicles available
+      setSelectedVehicle(null);
+      // Optionally clear vehicle from URL
+      const params = new URLSearchParams(searchParams.toString());
+      if (params.has('vehicle')) {
+          params.delete('vehicle');
+          router.replace(`${pathname}?${params.toString()}`);
+      }
+    }
+  }, [searchParams, vehicles, pathname, router, isLoading, selectedVehicle]);
 
   const selectVehicle = (vehicleId: string) => {
-    const vehicle = vehicles.find(v => v.id === vehicleId);
+    const vehicle = vehicles?.find(v => v.id === vehicleId);
     if (vehicle) {
       setSelectedVehicle(vehicle);
-      const params = new URLSearchParams(searchParams);
+      const params = new URLSearchParams(searchParams.toString());
       params.set('vehicle', vehicleId);
-      router.replace(`${pathname}?${params.toString()}`);
-    }
-  };
-
-  const addVehicle = (vehicle: Vehicle) => {
-    const newVehicles = [...vehicles, vehicle];
-    setVehicles(newVehicles);
-  };
-
-  const updateVehicle = (updatedVehicle: Vehicle) => {
-    const newVehicles = vehicles.map(v => v.id === updatedVehicle.id ? updatedVehicle : v);
-    setVehicles(newVehicles);
-  };
-
-  const deleteVehicle = (vehicleId: string) => {
-    const newVehicles = vehicles.filter(v => v.id !== vehicleId);
-    setVehicles(newVehicles);
-    if (selectedVehicle?.id === vehicleId) {
-        if (newVehicles.length > 0) {
-            selectVehicle(newVehicles[0].id);
-        } else {
-            setSelectedVehicle(null);
-            const params = new URLSearchParams(searchParams);
-            params.delete('vehicle');
-            router.replace(`${pathname}?${params.toString()}`);
-        }
+      router.push(`${pathname}?${params.toString()}`);
     }
   };
 
   return (
-    <VehicleContext.Provider value={{ vehicles, selectedVehicle, selectVehicle, addVehicle, updateVehicle, deleteVehicle }}>
+    <VehicleContext.Provider value={{ vehicles: vehicles || [], selectedVehicle, selectVehicle, isLoading }}>
       {children}
     </VehicleContext.Provider>
   );

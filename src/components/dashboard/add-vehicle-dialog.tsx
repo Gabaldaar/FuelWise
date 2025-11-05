@@ -28,6 +28,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { Vehicle } from '@/lib/types';
+import { useUser, useFirestore } from '@/firebase';
+import { doc, collection } from 'firebase/firestore';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 const formSchema = z.object({
   make: z.string().min(1, 'La marca es obligatoria.'),
@@ -43,13 +46,14 @@ type FormValues = z.infer<typeof formSchema>;
 interface AddVehicleDialogProps {
     vehicle?: Vehicle;
     children?: React.ReactNode;
-    onVehicleUpdate: (vehicle: Vehicle) => void;
 }
 
-export default function AddVehicleDialog({ vehicle, children, onVehicleUpdate }: AddVehicleDialogProps) {
+export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useUser();
+  const firestore = useFirestore();
   const isEditing = !!vehicle;
 
   const form = useForm<FormValues>({
@@ -57,37 +61,41 @@ export default function AddVehicleDialog({ vehicle, children, onVehicleUpdate }:
     defaultValues: {
       make: vehicle?.make || '',
       model: vehicle?.model || '',
-      year: vehicle?.year || '',
+      year: vehicle?.year || undefined,
       plate: vehicle?.plate || '',
-      fuelCapacityLiters: vehicle?.fuelCapacityLiters || '',
-      averageConsumptionKmPerLiter: vehicle?.averageConsumptionKmPerLiter || '',
+      fuelCapacityLiters: vehicle?.fuelCapacityLiters || undefined,
+      averageConsumptionKmPerLiter: vehicle?.averageConsumptionKmPerLiter || undefined,
     },
   });
 
   async function onSubmit(values: FormValues) {
-    setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (isEditing && vehicle) {
-        const updatedVehicle = { ...vehicle, ...values };
-        onVehicleUpdate(updatedVehicle);
+    if (!user) {
         toast({
-            title: 'Vehículo Actualizado',
-            description: `Tu ${values.make} ${values.model} ha sido actualizado.`,
+            variant: "destructive",
+            title: "Error de autenticación",
+            description: "Debes iniciar sesión para gestionar vehículos.",
         });
-    } else {
-        const newVehicle: Vehicle = {
-            id: `vehicle-${Date.now()}`,
-            imageUrl: `https://picsum.photos/seed/${Date.now()}/600/400`,
-            imageHint: `${values.make.toLowerCase()} ${values.model.toLowerCase()}`,
-            ...values,
-        };
-        onVehicleUpdate(newVehicle);
-        toast({
-            title: 'Vehículo Añadido',
-            description: `Tu ${values.make} ${values.model} ha sido añadido a tu garaje.`,
-        });
+        return;
     }
+    setIsSubmitting(true);
+    
+    const vehicleId = isEditing ? vehicle.id : doc(collection(firestore, '_')).id;
+    const vehicleRef = doc(firestore, 'users', user.uid, 'vehicles', vehicleId);
+    
+    const vehicleData = {
+        ...values,
+        id: vehicleId,
+        userId: user.uid,
+        imageUrl: vehicle?.imageUrl || `https://picsum.photos/seed/${vehicleId}/600/400`,
+        imageHint: vehicle?.imageHint || `${values.make.toLowerCase()} ${values.model.toLowerCase()}`,
+    };
+
+    setDocumentNonBlocking(vehicleRef, vehicleData, { merge: true });
+    
+    toast({
+        title: isEditing ? 'Vehículo Actualizado' : 'Vehículo Añadido',
+        description: `Tu ${values.make} ${values.model} ha sido ${isEditing ? 'actualizado' : 'añadido'}.`,
+    });
 
     setIsSubmitting(false);
     setOpen(false);
@@ -95,10 +103,10 @@ export default function AddVehicleDialog({ vehicle, children, onVehicleUpdate }:
         form.reset({
           make: '',
           model: '',
-          year: '',
+          year: undefined,
           plate: '',
-          fuelCapacityLiters: '',
-          averageConsumptionKmPerLiter: '',
+          fuelCapacityLiters: undefined,
+          averageConsumptionKmPerLiter: undefined,
         });
     }
   }
@@ -147,7 +155,7 @@ export default function AddVehicleDialog({ vehicle, children, onVehicleUpdate }:
                     <FormItem>
                         <FormLabel>Año</FormLabel>
                         <FormControl>
-                            <Input type="number" placeholder="e.g., 2023" {...field} />
+                            <Input type="number" placeholder="e.g., 2023" {...field} value={field.value ?? ''} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -167,7 +175,7 @@ export default function AddVehicleDialog({ vehicle, children, onVehicleUpdate }:
                     <FormItem>
                         <FormLabel>Capacidad Tanque (L)</FormLabel>
                         <FormControl>
-                            <Input type="number" placeholder="e.g., 50" {...field} />
+                            <Input type="number" placeholder="e.g., 50" {...field} value={field.value ?? ''} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -176,7 +184,7 @@ export default function AddVehicleDialog({ vehicle, children, onVehicleUpdate }:
                     <FormItem>
                         <FormLabel>Consumo (km/L)</FormLabel>
                         <FormControl>
-                            <Input type="number" step="0.1" placeholder="e.g., 14.5" {...field} />
+                            <Input type="number" step="0.1" placeholder="e.g., 14.5" {...field} value={field.value ?? ''} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>

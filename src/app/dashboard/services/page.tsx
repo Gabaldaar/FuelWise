@@ -1,40 +1,50 @@
 'use client';
 
-import { serviceReminders as initialServiceReminders } from '@/lib/data';
 import type { ServiceReminder } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Wrench, Calendar, Gauge, Edit, Trash2 } from 'lucide-react';
+import { Plus, Wrench, Calendar, Gauge, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import AddServiceReminderDialog from '@/components/dashboard/add-service-reminder-dialog';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ServicesPage() {
   const { selectedVehicle: vehicle } = useVehicles();
-  const [reminders, setReminders] = useState<ServiceReminder[]>(initialServiceReminders);
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { toast } = useToast();
 
-  const vehicleServiceReminders = reminders
-    .filter((reminder) => reminder.vehicleId === vehicle?.id)
-    .sort((a, b) => (a.isUrgent === b.isUrgent ? 0 : a.isUrgent ? -1 : 1));
+  const remindersQuery = useMemoFirebase(() => {
+    if (!user || !vehicle) return null;
+    return query(
+        collection(firestore, 'users', user.uid, 'vehicles', vehicle.id, 'service_reminders'),
+        orderBy('dueDate', 'asc')
+    );
+  }, [firestore, user, vehicle]);
 
-  const handleReminderUpdate = (reminder: ServiceReminder) => {
-    const isEditing = reminders.some(r => r.id === reminder.id);
-    if (isEditing) {
-      setReminders(reminders.map(r => r.id === reminder.id ? reminder : r));
-    } else {
-      setReminders([...reminders, reminder]);
-    }
-  };
-
+  const { data: reminders, isLoading } = useCollection<ServiceReminder>(remindersQuery);
+  
   const handleReminderDelete = (reminderId: string) => {
-    setReminders(reminders.filter(r => r.id !== reminderId));
+    if (!user || !vehicle) return;
+    const reminderRef = doc(firestore, 'users', user.uid, 'vehicles', vehicle.id, 'service_reminders', reminderId);
+    deleteDocumentNonBlocking(reminderRef);
+    toast({
+        title: "Recordatorio Completado",
+        description: "El recordatorio de servicio ha sido marcado como completado."
+    })
   };
   
   if (!vehicle) {
     return <div className="text-center">Por favor, seleccione un vehículo.</div>;
   }
+  
+  const vehicleServiceReminders = (reminders || []).sort((a, b) => (a.isUrgent === b.isUrgent ? 0 : a.isUrgent ? -1 : 1));
 
   return (
     <Card>
@@ -43,7 +53,7 @@ export default function ServicesPage() {
             <CardTitle className="font-headline">Servicios y Mantenimiento</CardTitle>
             <CardDescription>Gestiona los recordatorios de servicio para tu {vehicle.make} {vehicle.model}.</CardDescription>
         </div>
-        <AddServiceReminderDialog vehicleId={vehicle.id} onUpdate={handleReminderUpdate}>
+        <AddServiceReminderDialog vehicleId={vehicle.id}>
             <Button>
                 <Plus className='-ml-1 mr-2 h-4 w-4' />
                 Añadir Recordatorio
@@ -52,7 +62,12 @@ export default function ServicesPage() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-            {vehicleServiceReminders.length > 0 ? (
+            {isLoading ? (
+                <div className="flex flex-col items-center justify-center h-48 rounded-lg border-2 border-dashed">
+                    <Wrench className="h-12 w-12 text-muted-foreground animate-pulse" />
+                    <p className="mt-4 text-muted-foreground">Cargando recordatorios...</p>
+                </div>
+            ) : vehicleServiceReminders.length > 0 ? (
                 vehicleServiceReminders.map((reminder: ServiceReminder) => (
                     <div key={reminder.id} className="flex items-start gap-4 rounded-lg border p-4">
                         <div className="flex-shrink-0 pt-1">
@@ -80,7 +95,7 @@ export default function ServicesPage() {
                             </div>
                         </div>
                         <div className='flex items-center gap-2'>
-                             <AddServiceReminderDialog vehicleId={vehicle.id} reminder={reminder} onUpdate={handleReminderUpdate}>
+                             <AddServiceReminderDialog vehicleId={vehicle.id} reminder={reminder}>
                                 <Button variant="outline" size="icon">
                                     <Edit className="h-4 w-4" />
                                     <span className="sr-only">Editar</span>

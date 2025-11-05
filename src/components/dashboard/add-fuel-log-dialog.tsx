@@ -38,7 +38,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { fuelLogs } from '@/lib/data'; // For mock mutation
+import { useUser, useFirestore } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 const formSchema = z.object({
   date: z.date({
@@ -67,6 +69,9 @@ export default function AddFuelLogDialog({ vehicleId }: AddFuelLogDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const [lastEdited, setLastEdited] = useState<LastEditedField>(null);
+
+  const { user } = useUser();
+  const firestore = useFirestore();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -106,17 +111,24 @@ export default function AddFuelLogDialog({ vehicleId }: AddFuelLogDialogProps) {
 
 
   async function onSubmit(values: FormValues) {
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Debes iniciar sesión para añadir un registro."
+        });
+        return;
+    }
     setIsSubmitting(true);
-    // In a real app, this would be an API call. Here we simulate it.
-    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const newLog = {
-        id: `log-${Date.now()}`,
-        vehicleId,
+    const fuelLogData = {
         ...values,
         date: values.date.toISOString(),
+        vehicleId,
     };
-    fuelLogs.push(newLog); // Mutating mock data
+
+    const fuelLogsRef = collection(firestore, 'users', user.uid, 'vehicles', vehicleId, 'fuel_records');
+    addDocumentNonBlocking(fuelLogsRef, fuelLogData);
 
     toast({
       title: 'Éxito',

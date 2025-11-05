@@ -35,6 +35,9 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { ServiceReminder } from '@/lib/types';
+import { useUser, useFirestore } from '@/firebase';
+import { doc, collection } from 'firebase/firestore';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 const formSchema = z.object({
   serviceType: z.string().min(1, 'El tipo de servicio es obligatorio.'),
@@ -53,13 +56,14 @@ interface AddServiceReminderDialogProps {
   vehicleId: string;
   reminder?: ServiceReminder;
   children: React.ReactNode;
-  onUpdate: (reminder: ServiceReminder) => void;
 }
 
-export default function AddServiceReminderDialog({ vehicleId, reminder, children, onUpdate }: AddServiceReminderDialogProps) {
+export default function AddServiceReminderDialog({ vehicleId, reminder, children }: AddServiceReminderDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useUser();
+  const firestore = useFirestore();
   const isEditing = !!reminder;
 
   const form = useForm<FormValues>({
@@ -74,17 +78,29 @@ export default function AddServiceReminderDialog({ vehicleId, reminder, children
   });
 
   async function onSubmit(values: FormValues) {
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Debes iniciar sesión para gestionar recordatorios."
+        });
+        return;
+    }
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const reminderId = isEditing ? reminder.id : doc(collection(firestore, '_')).id;
+    const reminderRef = doc(firestore, 'users', user.uid, 'vehicles', vehicleId, 'service_reminders', reminderId);
     
     const reminderData = {
       ...values,
-      id: isEditing ? reminder.id : `reminder-${Date.now()}`,
+      id: reminderId,
       vehicleId,
       dueDate: values.dueDate?.toISOString(),
+      notes: values.notes || '',
+      dueOdometer: values.dueOdometer || null,
     };
 
-    onUpdate(reminderData as ServiceReminder);
+    setDocumentNonBlocking(reminderRef, reminderData, { merge: true });
 
     toast({
       title: isEditing ? 'Recordatorio Actualizado' : 'Recordatorio Creado',
@@ -185,7 +201,7 @@ export default function AddServiceReminderDialog({ vehicleId, reminder, children
                 <FormItem>
                   <FormLabel>Notas (Opcional)</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="e.g., Usar aceite sintético 5W-30." {...field} />
+                    <Textarea placeholder="e.g., Usar aceite sintético 5W-30." {...field} value={field.value ?? ''}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

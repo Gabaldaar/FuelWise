@@ -17,28 +17,38 @@ import {
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { Vehicle } from '@/lib/types';
+import { useUser, useFirestore } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 interface DeleteVehicleDialogProps {
   vehicle: Vehicle;
   children: React.ReactNode;
-  onVehicleDelete: (vehicleId: string) => void;
 }
 
 export default function DeleteVehicleDialog({
   vehicle,
   children,
-  onVehicleDelete,
 }: DeleteVehicleDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useUser();
+  const firestore = useFirestore();
 
   const handleDelete = async () => {
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Error de autenticación",
+            description: "Debes iniciar sesión para eliminar un vehículo.",
+        });
+        return;
+    }
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    
-    onVehicleDelete(vehicle.id);
+
+    const vehicleRef = doc(firestore, 'users', user.uid, 'vehicles', vehicle.id);
+    deleteDocumentNonBlocking(vehicleRef);
     
     toast({
       title: 'Vehículo Eliminado',
@@ -56,7 +66,7 @@ export default function DeleteVehicleDialog({
           <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
           <AlertDialogDescription>
             Esta acción no se puede deshacer. Se eliminará permanentemente tu{' '}
-            <span className="font-semibold">{vehicle.make} {vehicle.model}</span> de los registros.
+            <span className="font-semibold">{vehicle.make} {vehicle.model}</span> de la base de datos.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
