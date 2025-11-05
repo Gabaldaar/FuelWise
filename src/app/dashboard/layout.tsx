@@ -25,20 +25,24 @@ function DashboardLayoutContent({
   }, [user, isUserLoading, router]);
 
   if (isUserLoading || !user) {
-    return <div>Loading...</div>; // Or a proper loading spinner
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        Loading...
+      </div>
+    );
   }
   
   return (
     <VehicleProvider>
       <PreferencesProvider>
         <SidebarProvider>
-        <div className="min-h-screen">
+        <div className="relative flex h-screen w-full flex-col overflow-hidden">
             <Sidebar>
             <AppSidebar />
             </Sidebar>
             <SidebarInset>
             <AppHeader />
-            <main className="p-4 sm:p-6 lg:p-8 bg-background">
+            <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-background">
                 {children}
             </main>
             </SidebarInset>
