@@ -155,7 +155,7 @@ function TripDetails({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehi
                         <Edit className="h-4 w-4 mr-1" /> Ver/Editar
                     </Button>
                 </AddTripDialog>
-                <DeleteTripDialog vehicleId={vehicleId} tripId={trip.id}>
+                <DeleteTripDialog vehicleId={trip.vehicleId} tripId={trip.id}>
                   <Button variant="outline" size="sm" className="w-full text-destructive hover:text-destructive">
                       <Trash2 className="h-4 w-4 mr-1" /> Eliminar
                   </Button>
