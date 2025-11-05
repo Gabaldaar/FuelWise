@@ -1,11 +1,12 @@
 
+
 'use client';
 
 import type { ServiceReminder, ProcessedFuelLog } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Wrench, Calendar, Gauge, Edit, AlertTriangle, CheckCircle2, Repeat, DollarSign } from 'lucide-react';
+import { Plus, Wrench, Calendar, Gauge, Edit, AlertTriangle, CheckCircle2, Repeat, DollarSign, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
 import AddServiceReminderDialog from '@/components/dashboard/add-service-reminder-dialog';
@@ -54,14 +55,11 @@ export default function ServicesPage() {
       const aUrgency = a.dueOdometer ? a.dueOdometer - lastOdometer : Infinity;
       const bUrgency = b.dueOdometer ? b.dueOdometer - lastOdometer : Infinity;
       
-      // If one has odometer and is past due, it's more urgent
       if (aUrgency < 0 && bUrgency >= 0) return -1;
       if (bUrgency < 0 && aUrgency >= 0) return 1;
 
-      // If both have odometer, sort by that
       if (a.dueOdometer && b.dueOdometer) return aUrgency - bUrgency;
       
-      // Otherwise sort by date
       const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
       const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
       return aDate - bDate;
@@ -114,20 +112,19 @@ export default function ServicesPage() {
                               <Wrench className="h-6 w-6 text-muted-foreground" />
                             )}
                         </div>
-                        <div className={cn("flex-1", { "opacity-60": reminder.isCompleted })}>
-                            <div className="flex justify-between items-center">
+                        <div className={cn("flex-1 grid gap-y-2", { "opacity-60": reminder.isCompleted })}>
+                            <div className="flex justify-between items-start">
                                 <p className={cn("font-semibold text-lg", { "line-through": reminder.isCompleted })}>
                                   {reminder.serviceType}
                                 </p>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-shrink-0">
                                   {reminder.isRecurring && !reminder.isCompleted && <Badge variant="outline" className="flex items-center gap-1"><Repeat className="h-3 w-3"/> Recurrente</Badge>}
-                                  {reminder.isUrgent && !reminder.isCompleted && <Badge variant="destructive">Urgente</Badge>}
                                 </div>
                             </div>
-                            <p className="text-muted-foreground mt-1">{reminder.notes}</p>
+                            <p className="text-muted-foreground text-sm mt-1">{reminder.notes}</p>
                             
                              {reminder.isCompleted ? (
-                                <div className="text-sm text-muted-foreground flex flex-col items-start gap-y-2 mt-3">
+                                <div className="text-sm text-muted-foreground flex flex-col items-start gap-y-2 mt-2">
                                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                                     {reminder.completedDate && (
                                       <span className='flex items-center gap-1.5'>
@@ -178,7 +175,10 @@ export default function ServicesPage() {
                                   </span>
                                   )}
                                   {kmsRemaining !== null && (
-                                    <span className={`flex items-center gap-1.5 font-medium ${kmsRemaining < 0 ? 'text-destructive' : 'text-amber-600'}`}>
+                                    <span className={cn('flex items-center gap-1.5 font-medium', {
+                                      'text-destructive': kmsRemaining < 0,
+                                      'text-amber-600': kmsRemaining >= 0 && kmsRemaining < 1000,
+                                    })}>
                                       <AlertTriangle className="h-4 w-4" />
                                       {kmsRemaining < 0 
                                         ? `Vencido hace ${Math.abs(kmsRemaining).toLocaleString()} km`
@@ -189,14 +189,19 @@ export default function ServicesPage() {
                               </div>
                             )}
                         </div>
-                        <div className='flex items-center gap-2'>
+                        <div className='flex flex-col sm:flex-row items-center gap-2'>
                               <AddServiceReminderDialog vehicleId={vehicle.id} reminder={reminder} lastOdometer={lastOdometer}>
                                   <Button variant="outline" size="icon">
                                       <Edit className="h-4 w-4" />
                                       <span className="sr-only">Editar</span>
                                   </Button>
                               </AddServiceReminderDialog>
-                             <DeleteServiceReminderDialog vehicleId={vehicle.id} reminderId={reminder.id} />
+                             <DeleteServiceReminderDialog vehicleId={vehicle.id} reminderId={reminder.id}>
+                                <Button variant="outline" size="icon" className="text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                    <span className="sr-only">Eliminar</span>
+                                </Button>
+                             </DeleteServiceReminderDialog>
                         </div>
                     </div>
                   )

@@ -6,7 +6,6 @@ import WelcomeBanner from '@/components/dashboard/welcome-banner';
 import StatCard from '@/components/dashboard/stat-card';
 import FuelConsumptionChart from '@/components/dashboard/fuel-consumption-chart';
 import ServiceReminders from '@/components/dashboard/service-reminders';
-import FuelEstimate from '@/components/dashboard/fuel-estimate';
 import RecentFuelLogs from '@/components/dashboard/recent-fuel-logs';
 import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -83,6 +82,7 @@ export default function DashboardPage() {
   }
 
   const { processedLogs: vehicleFuelLogs, avgConsumption } = processFuelLogs(fuelLogs || [], vehicle);
+  const vehicleWithAvgConsumption = { ...vehicle, averageConsumptionKmPerLiter: avgConsumption };
   const vehicleServiceReminders = serviceReminders || [];
   
   const totalSpent = vehicleFuelLogs.reduce((acc, log) => acc + log.totalCost, 0);
@@ -94,7 +94,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <WelcomeBanner vehicle={vehicle} lastLog={vehicleFuelLogs[0]} />
+      <WelcomeBanner vehicle={vehicleWithAvgConsumption} lastLog={vehicleFuelLogs[0]} />
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Consumo Promedio" value={`${avgConsumption.toFixed(2)} km/L`} />
         <StatCard title="Costo Total" value={`$${totalSpent.toFixed(2)}`} />
@@ -113,12 +113,10 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
-           <Suspense fallback={<div>Cargando estimación...</div>}>
-            <FuelEstimate vehicle={{ ...vehicle, averageConsumptionKmPerLiter: avgConsumption }} />
-           </Suspense>
+           <ServiceReminders data={vehicleServiceReminders} />
         </div>
         <div className="lg:col-span-2">
-          <ServiceReminders data={vehicleServiceReminders} />
+          
         </div>
       </div>
     </div>

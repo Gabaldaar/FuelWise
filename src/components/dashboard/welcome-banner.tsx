@@ -1,14 +1,61 @@
+
+'use client';
+
 import Image from 'next/image';
-import type { Vehicle, FuelLog } from '@/lib/types';
+import type { Vehicle, FuelLog, ProcessedFuelLog } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import AddFuelLogDialog from './add-fuel-log-dialog';
+import { useEffect, useState } from 'react';
+import type { EstimateFuelStopOutput } from '@/ai/flows/estimate-fuel-stop';
+import { useToast } from '@/hooks/use-toast';
+import { ai } from '@/ai/client';
+import { formatDate } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
 
 interface WelcomeBannerProps {
-  vehicle: Vehicle;
-  lastLog?: FuelLog;
+  vehicle: Vehicle & { averageConsumptionKmPerLiter?: number };
+  lastLog?: ProcessedFuelLog;
 }
 
 export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) {
+  const [estimate, setEstimate] = useState<EstimateFuelStopOutput | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const getEstimate = async () => {
+      if (!vehicle || !vehicle.averageConsumptionKmPerLiter) return;
+
+      setIsLoading(true);
+      try {
+        // Assume 100% fuel after a fill-up, otherwise make a rough estimate.
+        // A more complex calculation could track fuel used since last log.
+        const currentFuelLevelPercent = lastLog?.isFillUp ? 100 : 80;
+
+        const output = await ai.estimateFuelStop({
+          vehicleMake: vehicle.make,
+          vehicleModel: vehicle.model,
+          vehicleYear: vehicle.year,
+          fuelCapacityLiters: vehicle.fuelCapacityLiters,
+          averageConsumptionKmPerLiter: vehicle.averageConsumptionKmPerLiter,
+          currentFuelLevelPercent: currentFuelLevelPercent,
+        });
+        setEstimate(output);
+      } catch (error) {
+        console.error('Error getting fuel estimate:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error de Estimación',
+          description: 'No se pudo estimar la próxima parada de combustible.',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    getEstimate();
+  }, [vehicle, lastLog, toast]);
+
   return (
     <Card className="overflow-hidden">
         <div className="flex flex-col md:flex-row">
@@ -25,7 +72,17 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
                     <p className="text-muted-foreground mb-4">
                         Aquí tienes un resumen del rendimiento y los próximos mantenimientos de tu vehículo. Añade un nuevo repostaje para mantener tus datos al día.
                     </p>
-                   {vehicle && <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} vehicle={vehicle} />}
+                    <div className="flex flex-wrap items-center gap-4">
+                      {vehicle && <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} vehicle={vehicle} />}
+                      {isLoading && <Loader2 className="h-5 w-5 animate-spin" />}
+                      {estimate && !isLoading && (
+                        <div className="text-sm text-muted-foreground">
+                            <span>Autonomía est: <b>{Math.round(estimate.estimatedDistanceToEmptyKm)} km</b></span>
+                            <span className="mx-2">|</span>
+                            <span>Próximo repostaje: <b>{formatDate(estimate.estimatedRefuelDate)}</b></span>
+                        </div>
+                      )}
+                   </div>
                 </CardContent>
             </div>
              {vehicle.imageUrl && (
