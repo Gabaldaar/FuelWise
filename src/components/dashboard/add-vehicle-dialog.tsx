@@ -119,26 +119,62 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="make" render={({ field }) => (
-                    <FormItem> <FormLabel>Marca</FormLabel> <FormControl> <Input placeholder="e.g., Toyota" {...field} /> </FormControl> <FormMessage /> </FormItem>
+                    <FormItem>
+                        <FormLabel>Marca</FormLabel>
+                        <FormControl>
+                            <Input placeholder="e.g., Toyota" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
                 )} />
                 <FormField control={form.control} name="model" render={({ field }) => (
-                    <FormItem> <FormLabel>Modelo</FormLabel> <FormControl> <Input placeholder="e.g., Corolla" {...field} /> </FormControl> <FormMessage /> </FormItem>
+                    <FormItem>
+                        <FormLabel>Modelo</FormLabel>
+                        <FormControl>
+                            <Input placeholder="e.g., Corolla" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
                 )} />
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="year" render={({ field }) => (
-                    <FormItem> <FormLabel>Año</FormLabel> <FormControl> <Input type="number" placeholder="e.g., 2023" {...field} /> </FormControl> <FormMessage /> </FormItem>
+                    <FormItem>
+                        <FormLabel>Año</FormLabel>
+                        <FormControl>
+                            <Input type="number" placeholder="e.g., 2023" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
                 )} />
                 <FormField control={form.control} name="plate" render={({ field }) => (
-                    <FormItem> <FormLabel>Patente</FormLabel> <FormControl> <Input placeholder="e.g., AB-123-CD" {...field} /> </FormControl> <FormMessage /> </FormItem>
+                    <FormItem>
+                        <FormLabel>Patente</FormLabel>
+                        <FormControl>
+                            <Input placeholder="e.g., AB-123-CD" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
                 )} />
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="fuelCapacityLiters" render={({ field }) => (
-                    <FormItem> <FormLabel>Capacidad Tanque (L)</FormLabel> <FormControl> <Input type="number" placeholder="e.g., 50" {...field} /> </FormControl> <FormMessage /> </FormItem>
+                    <FormItem>
+                        <FormLabel>Capacidad Tanque (L)</FormLabel>
+                        <FormControl>
+                            <Input type="number" placeholder="e.g., 50" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
                 )} />
                 <FormField control={form.control} name="averageConsumptionKmPerLiter" render={({ field }) => (
-                    <FormItem> <FormLabel>Consumo (km/L)</FormLabel> <FormControl> <Input type="number" step="0.1" placeholder="e.g., 14.5" {...field} /> </FormControl> <FormMessage /> </FormItem>
+                    <FormItem>
+                        <FormLabel>Consumo (km/L)</FormLabel>
+                        <FormControl>
+                            <Input type="number" step="0.1" placeholder="e.g., 14.5" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
                 )} />
             </div>
            
