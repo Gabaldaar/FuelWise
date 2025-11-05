@@ -21,6 +21,8 @@ export type FuelLog = {
   totalCost: number;
   liters: number;
   gasStation: string;
+  isFillUp: boolean;
+  username: string;
 };
 
 export type ServiceReminder = {

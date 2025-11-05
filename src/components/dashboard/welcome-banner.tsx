@@ -1,13 +1,14 @@
 import Image from 'next/image';
-import type { Vehicle } from '@/lib/types';
+import type { Vehicle, FuelLog } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import AddFuelLogDialog from './add-fuel-log-dialog';
 
 interface WelcomeBannerProps {
   vehicle: Vehicle;
+  lastLog?: FuelLog;
 }
 
-export default function WelcomeBanner({ vehicle }: WelcomeBannerProps) {
+export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) {
   return (
     <Card className="overflow-hidden">
         <div className="flex flex-col md:flex-row">
@@ -24,7 +25,7 @@ export default function WelcomeBanner({ vehicle }: WelcomeBannerProps) {
                     <p className="text-muted-foreground mb-4">
                         Aquí tienes un resumen del rendimiento y los próximos mantenimientos de tu vehículo. Añade un nuevo repostaje para mantener tus datos al día.
                     </p>
-                   {vehicle && <AddFuelLogDialog vehicleId={vehicle.id} />}
+                   {vehicle && <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} />}
                 </CardContent>
             </div>
              {vehicle.imageUrl && (

@@ -21,6 +21,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -36,11 +37,13 @@ import {
 } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useUser, useFirestore } from '@/firebase';
-import { collection } from 'firebase/firestore';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, doc } from 'firebase/firestore';
+import { addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import type { FuelLog } from '@/lib/types';
 
 const formSchema = z.object({
   date: z.date({
@@ -53,6 +56,7 @@ const formSchema = z.object({
   fuelType: z.enum(['Gasolina', 'Diesel', 'Etanol'], {
     required_error: 'El tipo de combustible es obligatorio.',
   }),
+  isFillUp: z.boolean().default(false),
   gasStation: z.string().optional(),
 });
 
@@ -62,9 +66,12 @@ type LastEditedField = 'totalCost' | 'liters' | 'pricePerLiter' | null;
 
 interface AddFuelLogDialogProps {
     vehicleId: string;
+    lastLog?: FuelLog;
+    fuelLog?: FuelLog;
+    children?: React.ReactNode;
 }
 
-export default function AddFuelLogDialog({ vehicleId }: AddFuelLogDialogProps) {
+export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, children }: AddFuelLogDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -72,22 +79,51 @@ export default function AddFuelLogDialog({ vehicleId }: AddFuelLogDialogProps) {
 
   const { user } = useUser();
   const firestore = useFirestore();
+  const isEditing = !!fuelLog;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      date: new Date(),
-      odometer: undefined,
-      totalCost: undefined,
-      liters: undefined,
-      pricePerLiter: undefined,
-      fuelType: 'Gasolina',
-      gasStation: '',
+      date: isEditing ? new Date(fuelLog.date) : new Date(),
+      odometer: isEditing ? fuelLog.odometer : undefined,
+      totalCost: isEditing ? fuelLog.totalCost : undefined,
+      liters: isEditing ? fuelLog.liters : undefined,
+      pricePerLiter: isEditing ? fuelLog.pricePerLiter : undefined,
+      fuelType: isEditing ? fuelLog.fuelType : 'Gasolina',
+      isFillUp: isEditing ? fuelLog.isFillUp : false,
+      gasStation: isEditing ? fuelLog.gasStation : '',
     },
   });
 
   const { watch, setValue, trigger } = form;
   const watchedValues = watch();
+
+  useEffect(() => {
+    if (!isEditing) {
+      form.reset({
+        date: new Date(),
+        odometer: undefined,
+        totalCost: undefined,
+        liters: undefined,
+        pricePerLiter: undefined,
+        fuelType: 'Gasolina',
+        isFillUp: false,
+        gasStation: '',
+      });
+    } else if (fuelLog) {
+      form.reset({
+        date: new Date(fuelLog.date),
+        odometer: fuelLog.odometer,
+        totalCost: fuelLog.totalCost,
+        liters: fuelLog.liters,
+        pricePerLiter: fuelLog.pricePerLiter,
+        fuelType: fuelLog.fuelType,
+        isFillUp: fuelLog.isFillUp,
+        gasStation: fuelLog.gasStation,
+      })
+    }
+  }, [fuelLog, isEditing, form, open]);
+
 
   useEffect(() => {
     const { totalCost, liters, pricePerLiter } = watchedValues;
@@ -119,47 +155,64 @@ export default function AddFuelLogDialog({ vehicleId }: AddFuelLogDialogProps) {
         });
         return;
     }
+    
+    if (lastLog && !isEditing) { // Only validate for new entries
+      const newDate = values.date.getTime();
+      const lastDate = new Date(lastLog.date).getTime();
+      const newOdometer = values.odometer;
+      const lastOdometer = lastLog.odometer;
+
+      if (newDate < lastDate && newOdometer > lastOdometer) {
+        form.setError("date", { message: "La fecha no puede ser anterior al último registro si el odómetro es mayor."});
+        form.setError("odometer", { message: "El odómetro no puede ser mayor si la fecha es anterior."});
+        return;
+      }
+      if (newDate > lastDate && newOdometer < lastOdometer) {
+        form.setError("date", { message: "La fecha no puede ser posterior al último registro si el odómetro es menor."});
+        form.setError("odometer", { message: "El odómetro no puede ser menor si la fecha es posterior."});
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     
+    const logId = isEditing ? fuelLog.id : doc(collection(firestore, '_')).id;
+    const fuelLogRef = doc(firestore, 'users', user.uid, 'vehicles', vehicleId, 'fuel_records', logId);
+
     const fuelLogData = {
         ...values,
+        id: logId,
         date: values.date.toISOString(),
         vehicleId,
+        username: user.displayName || user.email || 'Usuario',
+        gasStation: values.gasStation || ''
     };
 
-    const fuelLogsRef = collection(firestore, 'users', user.uid, 'vehicles', vehicleId, 'fuel_records');
-    addDocumentNonBlocking(fuelLogsRef, fuelLogData);
+    setDocumentNonBlocking(fuelLogRef, fuelLogData, { merge: true });
 
     toast({
-      title: 'Éxito',
-      description: 'Registro de combustible añadido correctamente.',
+      title: isEditing ? 'Registro Actualizado' : 'Registro Añadido',
+      description: 'El registro de combustible se ha guardado correctamente.',
     });
     setIsSubmitting(false);
     setOpen(false);
-    form.reset({
-      date: new Date(),
-      odometer: undefined,
-      totalCost: undefined,
-      liters: undefined,
-      pricePerLiter: undefined,
-      fuelType: 'Gasolina',
-      gasStation: '',
-    });
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="-ml-1 mr-2 h-4 w-4" />
-          Añadir Repostaje
-        </Button>
+        {children ? children : (
+            <Button>
+                <Plus className="-ml-1 mr-2 h-4 w-4" />
+                Añadir Repostaje
+            </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-headline">Nuevo Registro de Combustible</DialogTitle>
+          <DialogTitle className="font-headline">{isEditing ? 'Editar': 'Nuevo'} Registro de Combustible</DialogTitle>
           <DialogDescription>
-            Añade los detalles de tu último repostaje.
+            {isEditing ? 'Actualiza los detalles de tu repostaje.' : 'Añade los detalles de tu último repostaje.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -174,6 +227,7 @@ export default function AddFuelLogDialog({ vehicleId }: AddFuelLogDialogProps) {
                     <FormControl>
                         <Input type="number" placeholder="e.g., 25142" {...field} value={field.value ?? ''} />
                     </FormControl>
+                    {lastLog && <FormDescription>Último: {lastLog.odometer} km</FormDescription>}
                     <FormMessage />
                     </FormItem>
                 )}
@@ -300,11 +354,32 @@ export default function AddFuelLogDialog({ vehicleId }: AddFuelLogDialogProps) {
                 )}
                 />
             </div>
+
+            <FormField
+              control={form.control}
+              name="isFillUp"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel>¿Llenado completo?</FormLabel>
+                    <FormDescription>
+                      Marca esto si llenaste el tanque.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
            
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting} className="w-full">
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Guardar Registro
+                {isEditing ? 'Guardar Cambios' : 'Guardar Registro'}
               </Button>
             </DialogFooter>
           </form>

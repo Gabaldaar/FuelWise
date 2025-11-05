@@ -84,7 +84,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <WelcomeBanner vehicle={vehicle} />
+      <WelcomeBanner vehicle={vehicle} lastLog={vehicleFuelLogs[0]} />
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Consumo Promedio" value={`${avgConsumption.toFixed(2)} km/L`} />
         <StatCard title="Costo Total" value={`$${totalSpent.toFixed(2)}`} />
