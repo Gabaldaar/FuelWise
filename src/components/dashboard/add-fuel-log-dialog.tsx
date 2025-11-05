@@ -56,7 +56,7 @@ const formSchema = z.object({
   fuelType: z.enum(['Gasolina', 'Diesel', 'Etanol'], {
     required_error: 'El tipo de combustible es obligatorio.',
   }),
-  isFillUp: z.boolean().default(false),
+  isFillUp: z.boolean().default(true),
   gasStation: z.string().optional(),
 });
 
@@ -90,7 +90,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, children
       liters: isEditing ? fuelLog.liters : undefined,
       pricePerLiter: isEditing ? fuelLog.pricePerLiter : undefined,
       fuelType: isEditing ? fuelLog.fuelType : 'Gasolina',
-      isFillUp: isEditing ? fuelLog.isFillUp : false,
+      isFillUp: isEditing ? fuelLog.isFillUp : true,
       gasStation: isEditing ? fuelLog.gasStation : '',
     },
   });
@@ -107,7 +107,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, children
         liters: undefined,
         pricePerLiter: undefined,
         fuelType: 'Gasolina',
-        isFillUp: false,
+        isFillUp: true,
         gasStation: '',
       });
     } else if (fuelLog) {
