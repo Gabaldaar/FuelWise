@@ -94,8 +94,15 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
     if (!authUser) return null;
     return query(collection(firestore, 'fuel_types'), orderBy('name'));
   }, [firestore, authUser]);
+  
+  const gasStationsQuery = useMemoFirebase(() => {
+    if (!authUser) return null;
+    return query(collection(firestore, 'gas_stations'), orderBy('name'));
+  }, [firestore, authUser]);
 
   const { data: fuelTypes, isLoading: isLoadingFuelTypes } = useCollection<ConfigItem>(fuelTypesQuery);
+  const { data: gasStations, isLoading: isLoadingGasStations } = useCollection<ConfigItem>(gasStationsQuery);
+
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -330,7 +337,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
                 render={({ field }) => (
                     <FormItem>
                     <FormLabel>Tipo de Combustible</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                         <FormControl>
                         <SelectTrigger disabled={isLoadingFuelTypes}>
                             <SelectValue placeholder={isLoadingFuelTypes ? "Cargando..." : "Selecciona un tipo"} />
@@ -346,17 +353,26 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
                     </FormItem>
                 )}
                 />
-                 <FormField
+                <FormField
                 control={form.control}
                 name="gasStation"
                 render={({ field }) => (
-                    <FormItem>
+                  <FormItem>
                     <FormLabel>Gasolinera (Opcional)</FormLabel>
-                    <FormControl>
-                        <Input placeholder="e.g., Shell" {...field} value={field.value ?? ''} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value ?? ''}>
+                        <FormControl>
+                        <SelectTrigger disabled={isLoadingGasStations}>
+                            <SelectValue placeholder={isLoadingGasStations ? "Cargando..." : "Selecciona una"} />
+                        </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {gasStations?.map(station => (
+                            <SelectItem key={station.id} value={station.name}>{station.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                    </Select>
                     <FormMessage />
-                    </FormItem>
+                  </FormItem>
                 )}
                 />
             </div>
@@ -394,3 +410,5 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
     </Dialog>
   );
 }
+
+    
