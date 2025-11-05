@@ -1,6 +1,6 @@
-
 'use client';
 
+import { useState, useEffect, useMemo } from 'react';
 import type { ProcessedFuelLog, ServiceReminder, TimelineItem, ProcessedServiceReminder, Vehicle } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -24,7 +24,6 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { formatDate, cn } from '@/lib/utils';
-import { useMemo } from 'react';
 import AddFuelLogDialog from '@/components/dashboard/add-fuel-log-dialog';
 import DeleteFuelLogDialog from '@/components/dashboard/delete-fuel-log-dialog';
 import AddServiceReminderDialog from '@/components/dashboard/add-service-reminder-dialog';
@@ -32,7 +31,9 @@ import DeleteServiceReminderDialog from '@/components/dashboard/delete-service-r
 import { usePreferences } from '@/context/preferences-context';
 import { differenceInDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-
+import type { EstimateFuelStopOutput } from '@/ai/flows/estimate-fuel-stop';
+import { ai } from '@/ai/client';
+import EstimatedRefuelCard from '@/components/dashboard/estimated-refuel-card';
 
 type TimelineHistoryItem = {
     type: 'fuel' | 'service';
@@ -41,13 +42,46 @@ type TimelineHistoryItem = {
     data: ProcessedFuelLog | ProcessedServiceReminder;
 };
 
+function processFuelLogsForAvg(logs: ProcessedFuelLog[]): { processedLogs: ProcessedFuelLog[], avgConsumption: number } {
+  const sortedLogs = logs
+    .filter(log => log && typeof log.date === 'string')
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const processed = sortedLogs.map((log, index) => {
+    if (index === 0) {
+      return { ...log };
+    }
+    const prevLog = sortedLogs[index - 1];
+    if (!prevLog) return {...log};
+    
+    const distanceTraveled = log.odometer - prevLog.odometer;
+    const consumption = prevLog.isFillUp && !log.missedPreviousFillUp && distanceTraveled > 0 && log.liters > 0 
+      ? distanceTraveled / log.liters 
+      : 0;
+    
+    return {
+      ...log,
+      distanceTraveled,
+      consumption: parseFloat(consumption.toFixed(2)),
+    };
+  }).reverse(); 
+
+  const consumptionLogs = processed.filter(log => log.consumption && log.consumption > 0);
+  const avgConsumption = consumptionLogs.length > 0 
+    ? consumptionLogs.reduce((acc, log) => acc + (log.consumption || 0), 0) / consumptionLogs.length
+    : 0;
+
+  return { processedLogs: processed, avgConsumption };
+}
+
 
 export default function HistoryPage() {
   const { selectedVehicle: vehicle } = useVehicles();
   const { user } = useUser();
   const firestore = useFirestore();
   const { urgencyThresholdDays, urgencyThresholdKm } = usePreferences();
-
+  const [estimate, setEstimate] = useState<EstimateFuelStopOutput | null>(null);
+  const [isLoadingEstimate, setIsLoadingEstimate] = useState(false);
 
   const fuelLogsQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
@@ -75,9 +109,45 @@ export default function HistoryPage() {
 
   const { data: fuelLogs, isLoading: isLoadingLogs } = useCollection<ProcessedFuelLog>(fuelLogsQuery);
   const { data: serviceReminders, isLoading: isLoadingReminders } = useCollection<ServiceReminder>(remindersQuery);
-  const { data: lastFuelLog, isLoading: isLoadingLastLog } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
+  const { data: lastFuelLogResult, isLoading: isLoadingLastLog } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
 
-  const lastOdometer = lastFuelLog?.[0]?.odometer || 0;
+  const lastOdometer = lastFuelLogResult?.[0]?.odometer || 0;
+  const lastLogForEstimate = fuelLogs?.[0];
+
+  const { avgConsumption } = useMemo(() => {
+      if (!fuelLogs) return { avgConsumption: vehicle?.averageConsumptionKmPerLiter || 0 };
+      const { avgConsumption } = processFuelLogsForAvg(fuelLogs);
+      return { avgConsumption: avgConsumption > 0 ? avgConsumption : vehicle?.averageConsumptionKmPerLiter || 0 };
+  }, [fuelLogs, vehicle]);
+
+
+  useEffect(() => {
+    const getEstimate = async () => {
+      if (!vehicle || !avgConsumption) return;
+
+      setIsLoadingEstimate(true);
+      try {
+        const currentFuelLevelPercent = lastLogForEstimate?.isFillUp ? 100 : 80;
+
+        const output = await ai.estimateFuelStop({
+          vehicleMake: vehicle.make,
+          vehicleModel: vehicle.model,
+          vehicleYear: vehicle.year,
+          fuelCapacityLiters: vehicle.fuelCapacityLiters,
+          averageConsumptionKmPerLiter: avgConsumption,
+          currentFuelLevelPercent: currentFuelLevelPercent,
+        });
+        setEstimate(output);
+      } catch (error) {
+        console.error('Error getting fuel estimate:', error);
+      } finally {
+        setIsLoadingEstimate(false);
+      }
+    };
+
+    getEstimate();
+  }, [vehicle, lastLogForEstimate, avgConsumption]);
+
 
   const timelineItems = useMemo((): TimelineHistoryItem[] => {
     if (!fuelLogs && !serviceReminders) return [];
@@ -113,16 +183,13 @@ export default function HistoryPage() {
         timelineDate = reminder.completedDate;
       } else if (reminder.dueOdometer) {
         sortKey = reminder.dueOdometer;
-        timelineDate = reminder.dueDate; // Can be null, that's OK
+        timelineDate = reminder.dueDate; 
       } else if (reminder.dueDate) {
-        // Fallback for time-based reminders: convert date to a timestamp for sorting
         sortKey = new Date(reminder.dueDate).getTime();
         timelineDate = reminder.dueDate;
       }
 
-      // Ensure every reminder gets added, even if it lacks a specific date or odometer
       if (sortKey === null && !timelineDate) {
-          // If a reminder has no due date or odometer (should be rare), place it at the top based on creation
           sortKey = new Date().getTime();
           timelineDate = new Date().toISOString();
       }
@@ -131,7 +198,6 @@ export default function HistoryPage() {
         combined.push({
           type: 'service',
           sortKey: sortKey,
-          // If timelineDate is null (e.g., odometer-only reminder), provide a fallback for display
           date: timelineDate || new Date().toISOString(), 
           data: processedReminder,
         });
@@ -161,23 +227,28 @@ export default function HistoryPage() {
                 <History className="h-12 w-12 animate-pulse text-muted-foreground" />
                 <p className="mt-4 text-muted-foreground">Cargando historial...</p>
             </div>
-        ) : timelineItems.length > 0 ? (
-            <Accordion type="single" collapsible className="w-full">
-              {timelineItems.map((item, index) => (
-                <AccordionItem value={`${item.type}-${'id' in item.data ? item.data.id : index}-${index}`} key={`${item.type}-${'id' in item.data ? item.data.id : index}-${index}`}>
-                    {item.type === 'fuel' ? (
-                      <FuelLogItemContent log={item.data as ProcessedFuelLog} vehicle={vehicle as Vehicle} lastLog={lastLogForNewEntry} />
-                    ) : (
-                      <ServiceItemContent reminder={item.data as ProcessedServiceReminder} vehicleId={vehicle.id} lastOdometer={lastOdometer}/>
-                    )}
-                </AccordionItem>
-              ))}
-            </Accordion>
         ) : (
-             <div className="h-64 text-center flex flex-col items-center justify-center rounded-lg border-2 border-dashed">
-                <History className="h-12 w-12 text-muted-foreground" />
-                <p className="mt-4 font-semibold">No hay historial.</p>
-                <p className="text-sm text-muted-foreground">Añade repostajes o servicios para empezar a construir la línea de tiempo.</p>
+            <div className='space-y-2'>
+              <EstimatedRefuelCard estimate={estimate} isLoading={isLoadingEstimate} />
+              {timelineItems.length > 0 ? (
+                  <Accordion type="single" collapsible className="w-full">
+                    {timelineItems.map((item, index) => (
+                      <AccordionItem value={`${item.type}-${'id' in item.data ? item.data.id : index}-${index}`} key={`${item.type}-${'id' in item.data ? item.data.id : index}-${index}`}>
+                          {item.type === 'fuel' ? (
+                            <FuelLogItemContent log={item.data as ProcessedFuelLog} vehicle={vehicle as Vehicle} lastLog={lastLogForNewEntry} />
+                          ) : (
+                            <ServiceItemContent reminder={item.data as ProcessedServiceReminder} vehicleId={vehicle.id} lastOdometer={lastOdometer}/>
+                          )}
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+              ) : (
+                  <div className="h-64 text-center flex flex-col items-center justify-center rounded-lg border-2 border-dashed">
+                      <History className="h-12 w-12 text-muted-foreground" />
+                      <p className="mt-4 font-semibold">No hay historial.</p>
+                      <p className="text-sm text-muted-foreground">Añade repostajes o servicios para empezar a construir la línea de tiempo.</p>
+                  </div>
+              )}
             </div>
         )}
       </CardContent>
@@ -326,5 +397,3 @@ function ServiceItemContent({ reminder, vehicleId, lastOdometer }: { reminder: P
     </>
   )
 }
-
-    

@@ -1,0 +1,50 @@
+'use client';
+
+import { GasStation, Loader2, Calendar, Gauge } from 'lucide-react';
+import type { EstimateFuelStopOutput } from '@/ai/flows/estimate-fuel-stop';
+import { formatDate } from '@/lib/utils';
+import { Card } from '../ui/card';
+
+interface EstimatedRefuelCardProps {
+  estimate: EstimateFuelStopOutput | null;
+  isLoading: boolean;
+}
+
+export default function EstimatedRefuelCard({ estimate, isLoading }: EstimatedRefuelCardProps) {
+  return (
+    <Card className="border-dashed border-2 border-blue-500/50 bg-blue-500/10">
+      <div className="px-6 py-4 text-left">
+        <div className="flex items-center gap-4 w-full">
+          {isLoading ? (
+            <Loader2 className="h-8 w-8 flex-shrink-0 text-blue-500/80 animate-spin" />
+          ) : (
+            <GasStation className="h-8 w-8 flex-shrink-0 text-blue-500/80" />
+          )}
+
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold">
+              {isLoading ? 'Estimando próximo repostaje...' : 'Próximo Repostaje (Estimado)'}
+            </p>
+            {!isLoading && estimate && (
+              <p className="text-sm text-muted-foreground truncate">
+                Basado en tu consumo promedio.
+              </p>
+            )}
+          </div>
+          {!isLoading && estimate && (
+            <div className="text-right">
+              <p className="font-semibold flex items-center gap-2">
+                <Gauge className="h-4 w-4" />
+                {Math.round(estimate.estimatedDistanceToEmptyKm)} km
+              </p>
+              <p className="text-xs text-muted-foreground flex items-center justify-end gap-2">
+                <Calendar className="h-3 w-3" />
+                {formatDate(estimate.estimatedRefuelDate)}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
