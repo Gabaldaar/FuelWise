@@ -88,7 +88,7 @@ export type ConfigItem = {
 export type ConsumptionUnit = 'km/L' | 'L/100km';
 
 export type TimelineItem = {
-  type: 'fuel' | 'service';
+  type: 'fuel' | 'service' | 'trip';
   date: string;
-  data: ProcessedFuelLog | ProcessedServiceReminder;
+  data: ProcessedFuelLog | ProcessedServiceReminder | Trip;
 };

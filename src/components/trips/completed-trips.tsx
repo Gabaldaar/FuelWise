@@ -10,6 +10,7 @@ import { Button } from '../ui/button';
 import { useMemo } from 'react';
 import { differenceInHours, differenceInMinutes } from 'date-fns';
 import { usePreferences } from '@/context/preferences-context';
+import DeleteTripDialog from './delete-trip-dialog';
 
 interface CompletedTripsProps {
     trips: Trip[];
@@ -81,8 +82,8 @@ function TripDetails({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehi
             totalCost += (segmentDistance / fallbackConsumption) * historicAvgPrice;
         }
 
-        const finalAvgConsumption = kmTraveled / totalFuel;
-        const costPerKm = totalCost / kmTraveled;
+        const finalAvgConsumption = kmTraveled > 0 && totalFuel > 0 ? kmTraveled / totalFuel : 0;
+        const costPerKm = kmTraveled > 0 ? totalCost / kmTraveled : 0;
 
         let duration = "N/A";
         if (trip.endDate && trip.startDate) {
@@ -154,9 +155,11 @@ function TripDetails({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehi
                         <Edit className="h-4 w-4 mr-1" /> Ver/Editar
                     </Button>
                 </AddTripDialog>
-                <Button variant="outline" size="sm" className="w-full text-destructive hover:text-destructive" disabled>
-                    <Trash2 className="h-4 w-4 mr-1" /> Eliminar
-                </Button>
+                <DeleteTripDialog vehicleId={vehicleId} tripId={trip.id}>
+                  <Button variant="outline" size="sm" className="w-full text-destructive hover:text-destructive">
+                      <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+                  </Button>
+                </DeleteTripDialog>
             </div>
         </div>
     );

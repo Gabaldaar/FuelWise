@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import type { ProcessedFuelLog, ServiceReminder, TimelineItem, ProcessedServiceReminder, Vehicle } from '@/lib/types';
+import type { ProcessedFuelLog, ServiceReminder, TimelineItem, ProcessedServiceReminder, Vehicle, Trip } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
@@ -21,25 +21,31 @@ import {
   DollarSign,
   History,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Map,
+  Clock,
+  Wallet
 } from 'lucide-react';
-import { formatDate, cn } from '@/lib/utils';
+import { formatDate, formatDateTime } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import AddFuelLogDialog from '@/components/dashboard/add-fuel-log-dialog';
 import DeleteFuelLogDialog from '@/components/dashboard/delete-fuel-log-dialog';
 import AddServiceReminderDialog from '@/components/dashboard/add-service-reminder-dialog';
 import DeleteServiceReminderDialog from '@/components/dashboard/delete-service-reminder-dialog';
 import { usePreferences } from '@/context/preferences-context';
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, differenceInHours, differenceInMinutes } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import type { EstimateFuelStopOutput } from '@/ai/flows/estimate-fuel-stop';
 import { ai } from '@/ai/client';
 import EstimatedRefuelCard from '@/components/dashboard/estimated-refuel-card';
+import AddTripDialog from '@/components/dashboard/add-trip-dialog';
+import DeleteTripDialog from '@/components/trips/delete-trip-dialog';
 
 type TimelineHistoryItem = {
-    type: 'fuel' | 'service';
+    type: 'fuel' | 'service' | 'trip';
     sortKey: number; // Odometer or timestamp
     date: string;
-    data: ProcessedFuelLog | ProcessedServiceReminder;
+    data: ProcessedFuelLog | ProcessedServiceReminder | Trip;
 };
 
 function processFuelLogsForAvg(logs: ProcessedFuelLog[]): { processedLogs: ProcessedFuelLog[], avgConsumption: number } {
@@ -98,6 +104,14 @@ export default function HistoryPage() {
     );
   }, [firestore, user, vehicle]);
   
+  const tripsQuery = useMemoFirebase(() => {
+    if (!user || !vehicle) return null;
+    return query(
+      collection(firestore, 'vehicles', vehicle.id, 'trips'),
+      orderBy('endDate', 'desc')
+    );
+  }, [firestore, user, vehicle]);
+  
   const lastFuelLogQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
     return query(
@@ -109,6 +123,7 @@ export default function HistoryPage() {
 
   const { data: fuelLogs, isLoading: isLoadingLogs } = useCollection<ProcessedFuelLog>(fuelLogsQuery);
   const { data: serviceReminders, isLoading: isLoadingReminders } = useCollection<ServiceReminder>(remindersQuery);
+  const { data: trips, isLoading: isLoadingTrips } = useCollection<Trip>(tripsQuery);
   const { data: lastFuelLogResult, isLoading: isLoadingLastLog } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
 
   const lastOdometer = lastFuelLogResult?.[0]?.odometer || 0;
@@ -150,7 +165,7 @@ export default function HistoryPage() {
 
 
   const timelineItems = useMemo((): TimelineHistoryItem[] => {
-    if (!fuelLogs && !serviceReminders) return [];
+    if (!fuelLogs && !serviceReminders && !trips) return [];
 
     const combined: TimelineHistoryItem[] = [];
 
@@ -204,15 +219,26 @@ export default function HistoryPage() {
       }
     });
 
+    (trips || []).forEach(trip => {
+      if (trip.status === 'completed' && trip.endDate && trip.endOdometer) {
+        combined.push({
+          type: 'trip',
+          sortKey: trip.endOdometer,
+          date: trip.endDate,
+          data: trip,
+        });
+      }
+    });
+
     return combined.sort((a, b) => b.sortKey - a.sortKey);
 
-  }, [fuelLogs, serviceReminders, lastOdometer, urgencyThresholdDays, urgencyThresholdKm]);
+  }, [fuelLogs, serviceReminders, trips, lastOdometer, urgencyThresholdDays, urgencyThresholdKm]);
   
   if (!vehicle) {
     return <div className="text-center">Por favor, seleccione un vehículo.</div>;
   }
   
-  const isLoading = isLoadingLogs || isLoadingReminders || isLoadingLastLog;
+  const isLoading = isLoadingLogs || isLoadingReminders || isLoadingLastLog || isLoadingTrips;
   const lastLogForNewEntry = fuelLogs?.[0];
 
   return (
@@ -234,11 +260,9 @@ export default function HistoryPage() {
                   <Accordion type="single" collapsible className="w-full">
                     {timelineItems.map((item, index) => (
                       <AccordionItem value={`${item.type}-${'id' in item.data ? item.data.id : index}-${index}`} key={`${item.type}-${'id' in item.data ? item.data.id : index}-${index}`}>
-                          {item.type === 'fuel' ? (
-                            <FuelLogItemContent log={item.data as ProcessedFuelLog} vehicle={vehicle as Vehicle} lastLog={lastLogForNewEntry} />
-                          ) : (
-                            <ServiceItemContent reminder={item.data as ProcessedServiceReminder} vehicleId={vehicle.id} lastOdometer={lastOdometer}/>
-                          )}
+                          {item.type === 'fuel' && <FuelLogItemContent log={item.data as ProcessedFuelLog} vehicle={vehicle as Vehicle} lastLog={lastLogForNewEntry} />}
+                          {item.type === 'service' && <ServiceItemContent reminder={item.data as ProcessedServiceReminder} vehicleId={vehicle.id} lastOdometer={lastOdometer} />}
+                          {item.type === 'trip' && <TripItemContent trip={item.data as Trip} vehicle={vehicle as Vehicle} allFuelLogs={fuelLogs || []} />}
                       </AccordionItem>
                     ))}
                   </Accordion>
@@ -393,6 +417,129 @@ function ServiceItemContent({ reminder, vehicleId, lastOdometer }: { reminder: P
                   </DeleteServiceReminderDialog>
               </div>
           </div>
+      </AccordionContent>
+    </>
+  )
+}
+
+function TripItemContent({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehicle, allFuelLogs: ProcessedFuelLog[] }) {
+    const { getFormattedConsumption, consumptionUnit } = usePreferences();
+    
+    const tripCalculations = useMemo(() => {
+        if (!trip.endOdometer || !trip.startOdometer) {
+            return { kmTraveled: 0, fuelConsumed: 0, totalCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A" };
+        }
+        const kmTraveled = trip.endOdometer - trip.startOdometer;
+        if (kmTraveled <= 0) {
+            return { kmTraveled: 0, fuelConsumed: 0, totalCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A" };
+        }
+        const sortedLogs = [...allFuelLogs].sort((a, b) => a.odometer - b.odometer);
+        const logsInTrip = sortedLogs.filter(log => log.odometer > trip.startOdometer! && log.odometer < trip.endOdometer!);
+        const keyOdometerPoints = [trip.startOdometer, ...logsInTrip.map(l => l.odometer), trip.endOdometer];
+        let totalFuel = 0;
+        let totalCost = 0;
+        const fallbackConsumption = vehicle.averageConsumptionKmPerLiter > 0 ? vehicle.averageConsumptionKmPerLiter : 1;
+        const historicAvgPrice = sortedLogs.length > 0 ? sortedLogs.reduce((acc, log) => acc + log.pricePerLiter, 0) / sortedLogs.length : 0;
+        
+        for (let i = 0; i < keyOdometerPoints.length - 1; i++) {
+            const segmentStartOdo = keyOdometerPoints[i];
+            const segmentEndOdo = keyOdometerPoints[i+1];
+            const segmentDistance = segmentEndOdo - segmentStartOdo;
+            if (segmentDistance <= 0) continue;
+            const segmentStartLog = logsInTrip.find(l => l.odometer === segmentStartOdo);
+            if (segmentStartLog && segmentStartLog.isFillUp && !segmentStartLog.missedPreviousFillUp) {
+                const logIndex = sortedLogs.findIndex(l => l.id === segmentStartLog.id);
+                if (logIndex > 0) {
+                    const prevLog = sortedLogs[logIndex - 1];
+                    const distanceSinceLastFill = segmentStartLog.odometer - prevLog.odometer;
+                    if (distanceSinceLastFill > 0 && prevLog.isFillUp) {
+                        const realConsumption = distanceSinceLastFill / segmentStartLog.liters;
+                        if (realConsumption > 0) {
+                            totalFuel += segmentDistance / realConsumption;
+                            totalCost += (segmentDistance / realConsumption) * segmentStartLog.pricePerLiter;
+                            continue;
+                        }
+                    }
+                }
+            }
+            totalFuel += segmentDistance / fallbackConsumption;
+            totalCost += (segmentDistance / fallbackConsumption) * historicAvgPrice;
+        }
+
+        const finalAvgConsumption = kmTraveled > 0 && totalFuel > 0 ? kmTraveled / totalFuel : 0;
+        const costPerKm = kmTraveled > 0 ? totalCost / kmTraveled : 0;
+        let duration = "N/A";
+        if (trip.endDate && trip.startDate) {
+            const hours = differenceInHours(new Date(trip.endDate), new Date(trip.startDate));
+            const minutes = differenceInMinutes(new Date(trip.endDate), new Date(trip.startDate)) % 60;
+            duration = `${hours}h ${minutes}m`;
+        }
+        return { kmTraveled, fuelConsumed: totalFuel, totalCost, avgConsumptionForTrip: finalAvgConsumption, costPerKm, duration };
+    }, [trip, allFuelLogs, vehicle.averageConsumptionKmPerLiter]);
+
+    const { kmTraveled, fuelConsumed, totalCost, avgConsumptionForTrip, costPerKm, duration } = tripCalculations;
+    const lastOdometer = trip.endOdometer || 0;
+
+  return (
+    <>
+      <AccordionTrigger className="px-6 py-4 text-left hover:no-underline">
+        <div className="flex items-center gap-4 w-full">
+          <Map className="h-8 w-8 flex-shrink-0 text-purple-500/80" />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold">{formatDate(trip.endDate!)} - Viaje a {trip.destination}</p>
+            <p className="text-sm text-muted-foreground truncate">{trip.tripType}</p>
+          </div>
+          <div className="text-right">
+            <p className="font-semibold">{kmTraveled.toLocaleString()} km</p>
+            <p className="text-xs text-muted-foreground">Distancia</p>
+          </div>
+        </div>
+      </AccordionTrigger>
+      <AccordionContent className="px-6 pb-4">
+        <div className="space-y-3 pt-4 border-t pl-12">
+           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                    <Droplets className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                        <p className="font-medium">{fuelConsumed.toFixed(2)} L</p>
+                        <p className="text-xs text-muted-foreground">Combustible (Est.)</p>
+                    </div>
+                </div>
+                 <div className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                        <p className="font-medium">${totalCost.toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">Costo Total (Est.)</p>
+                    </div>
+                </div>
+                 <div className="flex items-center gap-2">
+                    <Gauge className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                        <p className="font-medium">{getFormattedConsumption(avgConsumptionForTrip)}</p>
+                        <p className="text-xs text-muted-foreground">Consumo ({consumptionUnit})</p>
+                    </div>
+                </div>
+                 <div className="flex items-center gap-2">
+                     <Clock className="h-4 w-4 text-muted-foreground" />
+                     <div>
+                        <p className="font-medium">{duration}</p>
+                        <p className="text-xs text-muted-foreground">Duración</p>
+                     </div>
+                </div>
+            </div>
+             <div className="flex gap-2 pt-4">
+                <AddTripDialog vehicleId={trip.vehicleId} trip={trip} lastOdometer={lastOdometer}>
+                    <Button variant="outline" size="sm" className="w-full">
+                        <Edit className="h-4 w-4 mr-1" /> Ver/Editar
+                    </Button>
+                </AddTripDialog>
+                 <DeleteTripDialog vehicleId={trip.vehicleId} tripId={trip.id}>
+                    <Button variant="outline" size="sm" className="w-full text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+                    </Button>
+                 </DeleteTripDialog>
+            </div>
+        </div>
       </AccordionContent>
     </>
   )
