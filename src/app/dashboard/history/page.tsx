@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { ProcessedFuelLog, ServiceReminder, TimelineItem } from '@/lib/types';
+import type { ProcessedFuelLog, ServiceReminder, TimelineItem, ProcessedServiceReminder } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
@@ -20,34 +20,47 @@ import {
   Trash2,
   DollarSign,
   History,
-  CheckCircle2
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+import { formatDate, cn } from '@/lib/utils';
 import { useMemo } from 'react';
 import AddFuelLogDialog from '@/components/dashboard/add-fuel-log-dialog';
 import DeleteFuelLogDialog from '@/components/dashboard/delete-fuel-log-dialog';
 import AddServiceReminderDialog from '@/components/dashboard/add-service-reminder-dialog';
 import DeleteServiceReminderDialog from '@/components/dashboard/delete-service-reminder-dialog';
+import { usePreferences } from '@/context/preferences-context';
+import { differenceInDays } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+
+
+type TimelineHistoryItem = {
+    type: 'fuel' | 'service';
+    sortKey: number; // Odometer or timestamp
+    date: string;
+    data: ProcessedFuelLog | ProcessedServiceReminder;
+};
 
 
 export default function HistoryPage() {
   const { selectedVehicle: vehicle } = useVehicles();
   const { user } = useUser();
   const firestore = useFirestore();
+  const { urgencyThresholdDays, urgencyThresholdKm } = usePreferences();
+
 
   const fuelLogsQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'fuel_records'),
-      orderBy('date', 'desc')
+      orderBy('odometer', 'desc')
     );
   }, [firestore, user, vehicle]);
 
   const remindersQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
     return query(
-      collection(firestore, 'vehicles', vehicle.id, 'service_reminders'),
-      orderBy('date', 'desc')
+      collection(firestore, 'vehicles', vehicle.id, 'service_reminders')
     );
   }, [firestore, user, vehicle]);
   
@@ -64,42 +77,69 @@ export default function HistoryPage() {
   const { data: serviceReminders, isLoading: isLoadingReminders } = useCollection<ServiceReminder>(remindersQuery);
   const { data: lastFuelLog, isLoading: isLoadingLastLog } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
 
-  const timelineItems = useMemo((): TimelineItem[] => {
+  const lastOdometer = lastFuelLog?.[0]?.odometer || 0;
+
+  const timelineItems = useMemo((): TimelineHistoryItem[] => {
     if (!fuelLogs && !serviceReminders) return [];
 
-    const combined: TimelineItem[] = [];
+    const combined: TimelineHistoryItem[] = [];
 
     (fuelLogs || []).forEach(log => {
       combined.push({
         type: 'fuel',
+        sortKey: log.odometer,
         date: log.date,
         data: log
       });
     });
 
     (serviceReminders || []).forEach(reminder => {
-      // For the timeline, we prioritize the completion date. If not completed, use the due date.
-      const timelineDate = reminder.completedDate || reminder.dueDate;
-      if (timelineDate) {
+      const kmsRemaining = reminder.dueOdometer ? reminder.dueOdometer - lastOdometer : null;
+      const daysRemaining = reminder.dueDate ? differenceInDays(new Date(reminder.dueDate), new Date()) : null;
+      
+      const isOverdue = (kmsRemaining !== null && kmsRemaining < 0) || (daysRemaining !== null && daysRemaining < 0);
+      const isUrgent = !isOverdue && (
+          (kmsRemaining !== null && kmsRemaining <= urgencyThresholdKm) || 
+          (daysRemaining !== null && daysRemaining <= urgencyThresholdDays)
+      );
+
+      const processedReminder: ProcessedServiceReminder = { ...reminder, kmsRemaining, daysRemaining, isOverdue, isUrgent };
+      
+      let sortKey: number | null = null;
+      let timelineDate: string | null = null;
+
+      if (reminder.isCompleted && reminder.completedOdometer) {
+        sortKey = reminder.completedOdometer;
+        timelineDate = reminder.completedDate;
+      } else if (reminder.dueOdometer) {
+        sortKey = reminder.dueOdometer;
+        timelineDate = reminder.dueDate;
+      } else if (reminder.dueDate) {
+        // Fallback to date if no odometer is present, using timestamp as sort key
+        sortKey = new Date(reminder.dueDate).getTime();
+        timelineDate = reminder.dueDate;
+      }
+
+      if (sortKey !== null && timelineDate) {
         combined.push({
           type: 'service',
+          sortKey: sortKey,
           date: timelineDate,
-          data: reminder
+          data: processedReminder,
         });
       }
     });
 
-    return combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return combined.sort((a, b) => b.sortKey - a.sortKey);
 
-  }, [fuelLogs, serviceReminders]);
+  }, [fuelLogs, serviceReminders, lastOdometer, urgencyThresholdDays, urgencyThresholdKm]);
   
   if (!vehicle) {
     return <div className="text-center">Por favor, seleccione un vehículo.</div>;
   }
   
   const isLoading = isLoadingLogs || isLoadingReminders || isLoadingLastLog;
-  const lastOdometer = lastFuelLog?.[0]?.odometer || 0;
-  const lastLogForNewEntry = fuelLogs?.[0]; // Already sorted desc
+  const lastLogForNewEntry = fuelLogs?.[0];
 
   return (
      <Card>
@@ -116,11 +156,11 @@ export default function HistoryPage() {
         ) : timelineItems.length > 0 ? (
             <Accordion type="single" collapsible className="w-full">
               {timelineItems.map((item, index) => (
-                <AccordionItem value={`${item.type}-${'id' in item.data ? item.data.id : index}`} key={`${item.type}-${'id' in item.data ? item.data.id : index}`}>
+                <AccordionItem value={`${item.type}-${'id' in item.data ? item.data.id : index}-${index}`} key={`${item.type}-${'id' in item.data ? item.data.id : index}-${index}`}>
                     {item.type === 'fuel' ? (
                       <FuelLogItemContent log={item.data as ProcessedFuelLog} vehicle={vehicle} lastLog={lastLogForNewEntry} />
                     ) : (
-                      <ServiceItemContent reminder={item.data as ServiceReminder} vehicleId={vehicle.id} lastOdometer={lastOdometer}/>
+                      <ServiceItemContent reminder={item.data as ProcessedServiceReminder} vehicleId={vehicle.id} lastOdometer={lastOdometer}/>
                     )}
                 </AccordionItem>
               ))}
@@ -142,11 +182,15 @@ function FuelLogItemContent({ log, vehicle, lastLog }: { log: ProcessedFuelLog, 
   return (
     <>
       <AccordionTrigger className="px-6 py-4 text-left hover:no-underline">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 w-full">
             <Fuel className="h-8 w-8 flex-shrink-0 text-blue-500/80" />
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
                 <p className="font-semibold">{formatDate(log.date)} - Repostaje</p>
-                <p className="text-sm text-muted-foreground">${log.totalCost.toFixed(2)} por {log.liters.toFixed(2)}L en {log.gasStation}</p>
+                <p className="text-sm text-muted-foreground truncate">${log.totalCost.toFixed(2)} por {log.liters.toFixed(2)}L en {log.gasStation}</p>
+            </div>
+            <div className="text-right">
+                <p className="font-semibold">{log.odometer.toLocaleString()} km</p>
+                <p className="text-xs text-muted-foreground">Odómetro</p>
             </div>
         </div>
       </AccordionTrigger>
@@ -154,17 +198,13 @@ function FuelLogItemContent({ log, vehicle, lastLog }: { log: ProcessedFuelLog, 
           <div className="space-y-3 pt-4 border-t pl-12">
               <div className="grid grid-cols-2 gap-4 text-sm">
                    <div>
-                      <p className="font-medium">{log.odometer.toLocaleString()} km</p>
-                      <p className="text-xs text-muted-foreground">Odómetro</p>
-                   </div>
-                   <div>
                       <p className="font-medium">${log.pricePerLiter.toFixed(2)}</p>
                       <p className="text-xs text-muted-foreground">Precio/Litro</p>
                    </div>
-              </div>
-              <div className="flex justify-between text-sm items-center">
-                  <span className="flex items-center gap-2 text-muted-foreground"><UserIcon className="h-4 w-4" /> Conductor</span>
-                  <span>{log.username}</span>
+                   <div>
+                      <p className="font-medium">{log.username}</p>
+                      <p className="text-xs text-muted-foreground">Conductor</p>
+                   </div>
               </div>
               <div className="flex gap-2 pt-4">
                   <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} fuelLog={log} vehicle={vehicle}>
@@ -184,26 +224,50 @@ function FuelLogItemContent({ log, vehicle, lastLog }: { log: ProcessedFuelLog, 
   )
 }
 
-function ServiceItemContent({ reminder, vehicleId, lastOdometer }: { reminder: ServiceReminder, vehicleId: string, lastOdometer: number }) {
+function ServiceItemContent({ reminder, vehicleId, lastOdometer }: { reminder: ProcessedServiceReminder, vehicleId: string, lastOdometer: number }) {
+  const { isCompleted, isOverdue, isUrgent } = reminder;
+
+  const getServiceStatusText = () => {
+    if (isCompleted) {
+      return { text: `Completado el ${formatDate(reminder.completedDate!)}`, icon: <CheckCircle2 className="h-8 w-8 flex-shrink-0 text-green-600" /> };
+    }
+    if (isOverdue) {
+      return { text: 'Servicio Vencido', icon: <Wrench className="h-8 w-8 flex-shrink-0 text-destructive" /> };
+    }
+    if (isUrgent) {
+      return { text: 'Servicio Urgente', icon: <Wrench className="h-8 w-8 flex-shrink-0 text-amber-600" /> };
+    }
+    return { text: 'Próximo Servicio', icon: <Wrench className="h-8 w-8 flex-shrink-0 text-muted-foreground" /> };
+  };
+
+  const status = getServiceStatusText();
+
   return (
      <>
-      <AccordionTrigger className="px-6 py-4 text-left hover:no-underline">
-        <div className="flex items-center gap-4">
-            {reminder.isCompleted ? <CheckCircle2 className="h-8 w-8 flex-shrink-0 text-green-600" /> : <Wrench className="h-8 w-8 flex-shrink-0 text-amber-500/80" />}
-            <div className="flex-1">
-                <p className="font-semibold">{formatDate(reminder.date)} - {reminder.isCompleted ? 'Servicio Completado' : 'Recordatorio de Servicio'}</p>
-                <p className="text-sm text-muted-foreground">{reminder.serviceType}</p>
+      <AccordionTrigger className={cn("px-6 py-4 text-left hover:no-underline", {
+        "bg-destructive/10 border-destructive/50": !isCompleted && isOverdue,
+        "bg-amber-500/10 border-amber-500/50": !isCompleted && isUrgent,
+      })}>
+        <div className="flex items-center gap-4 w-full">
+            {status.icon}
+            <div className="flex-1 min-w-0">
+                <p className="font-semibold">{status.text}</p>
+                <p className="text-sm text-muted-foreground truncate">{reminder.serviceType}</p>
             </div>
+            { (reminder.dueOdometer || reminder.completedOdometer) && (
+              <div className="text-right">
+                  <p className="font-semibold">
+                    {(reminder.isCompleted ? reminder.completedOdometer : reminder.dueOdometer)?.toLocaleString()} km
+                  </p>
+                  <p className="text-xs text-muted-foreground">{isCompleted ? 'Completado a los' : 'Vence a los'}</p>
+              </div>
+            )}
         </div>
       </AccordionTrigger>
       <AccordionContent className="px-6 pb-4">
           <div className="space-y-3 pt-4 border-t pl-12">
-               {reminder.isCompleted ? (
+               {isCompleted ? (
                  <div className="space-y-2 text-sm">
-                    {reminder.completedOdometer && <div className="flex justify-between">
-                        <span className="flex items-center gap-2 text-muted-foreground"><Gauge className="h-4 w-4" /> Odómetro</span>
-                        <span>{reminder.completedOdometer.toLocaleString()} km</span>
-                    </div>}
                     {reminder.cost && <div className="flex justify-between">
                         <span className="flex items-center gap-2 text-muted-foreground"><DollarSign className="h-4 w-4" /> Costo</span>
                         <span>${reminder.cost.toFixed(2)}</span>
@@ -215,17 +279,32 @@ function ServiceItemContent({ reminder, vehicleId, lastOdometer }: { reminder: S
                  </div>
               ) : (
                  <div className="space-y-2 text-sm">
-                    {reminder.dueOdometer && <div className="flex justify-between">
-                        <span className="flex items-center gap-2 text-muted-foreground"><Gauge className="h-4 w-4" /> Odómetro Límite</span>
-                        <span>{reminder.dueOdometer.toLocaleString()} km</span>
+                    {reminder.dueDate && <div className="flex justify-between">
+                        <span className="flex items-center gap-2 text-muted-foreground"><Calendar className="h-4 w-4" /> Fecha Límite</span>
+                        <span>{formatDate(reminder.dueDate)}</span>
                     </div>}
+                    <div className={cn('flex justify-between font-medium', { 'text-destructive': isOverdue, 'text-amber-600': isUrgent })}>
+                        <span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Estado</span>
+                        <span>
+                            {reminder.kmsRemaining !== null && reminder.kmsRemaining < 0 
+                                ? `Vencido ${Math.abs(reminder.kmsRemaining).toLocaleString()} km`
+                                : reminder.kmsRemaining !== null ? `Faltan ${reminder.kmsRemaining.toLocaleString()} km` : ''
+                            }
+                            {(reminder.kmsRemaining !== null && reminder.daysRemaining !== null) && ' / '}
+                            {reminder.daysRemaining !== null && reminder.daysRemaining < 0
+                                ? `Vencido ${Math.abs(reminder.daysRemaining)} días`
+                                : reminder.daysRemaining !== null ? `Faltan ${reminder.daysRemaining} días` : ''
+                            }
+                        </span>
+                    </div>
+
                     {reminder.notes && <p className="text-muted-foreground italic pt-2">{reminder.notes}</p>}
                  </div>
               )}
               <div className="flex gap-2 pt-4">
                   <AddServiceReminderDialog vehicleId={vehicleId} reminder={reminder} lastOdometer={lastOdometer}>
                       <Button variant="outline" size="sm" className="w-full">
-                          <Edit className="h-4 w-4 mr-1" /> {reminder.isCompleted ? 'Ver/Editar' : 'Completar/Editar'}
+                          <Edit className="h-4 w-4 mr-1" /> {isCompleted ? 'Ver/Editar' : 'Completar/Editar'}
                       </Button>
                   </AddServiceReminderDialog>
                   <DeleteServiceReminderDialog vehicleId={vehicleId} reminderId={reminder.id}>
@@ -239,5 +318,3 @@ function ServiceItemContent({ reminder, vehicleId, lastOdometer }: { reminder: S
     </>
   )
 }
-
-    

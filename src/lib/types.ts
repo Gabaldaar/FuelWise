@@ -53,10 +53,10 @@ export type ProcessedFuelLog = FuelLog & {
 
 // This type is for client-side processing only
 export type ProcessedServiceReminder = ServiceReminder & {
-    kmsRemaining?: number | null;
-    daysRemaining?: number | null;
-    isUrgent?: boolean;
-    isOverdue?: boolean;
+    kmsRemaining: number | null;
+    daysRemaining: number | null;
+    isUrgent: boolean;
+    isOverdue: boolean;
 };
 
 
@@ -76,5 +76,5 @@ export type ConsumptionUnit = 'km/L' | 'L/100km';
 export type TimelineItem = {
   type: 'fuel' | 'service';
   date: string;
-  data: FuelLog | ServiceReminder;
+  data: ProcessedFuelLog | ProcessedServiceReminder;
 };
