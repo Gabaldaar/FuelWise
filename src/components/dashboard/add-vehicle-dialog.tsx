@@ -39,6 +39,7 @@ const formSchema = z.object({
   plate: z.string().min(1, 'La patente es obligatoria.'),
   fuelCapacityLiters: z.coerce.number().min(1, 'La capacidad del tanque es obligatoria.'),
   averageConsumptionKmPerLiter: z.coerce.number().min(1, 'El consumo es obligatorio.'),
+  imageUrl: z.string().url('URL de imagen inválida.').optional().or(z.literal('')),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -61,10 +62,11 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
     defaultValues: {
       make: vehicle?.make || '',
       model: vehicle?.model || '',
-      year: vehicle?.year || undefined,
+      year: vehicle?.year,
       plate: vehicle?.plate || '',
-      fuelCapacityLiters: vehicle?.fuelCapacityLiters || undefined,
-      averageConsumptionKmPerLiter: vehicle?.averageConsumptionKmPerLiter || undefined,
+      fuelCapacityLiters: vehicle?.fuelCapacityLiters,
+      averageConsumptionKmPerLiter: vehicle?.averageConsumptionKmPerLiter,
+      imageUrl: vehicle?.imageUrl || '',
     },
   });
 
@@ -86,8 +88,8 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
         ...values,
         id: vehicleId,
         userId: user.uid,
-        imageUrl: vehicle?.imageUrl || `https://picsum.photos/seed/${vehicleId}/600/400`,
-        imageHint: vehicle?.imageHint || `${values.make.toLowerCase()} ${values.model.toLowerCase()}`,
+        imageUrl: values.imageUrl || `https://picsum.photos/seed/${vehicleId}/600/400`,
+        imageHint: `${values.make.toLowerCase()} ${values.model.toLowerCase()}`,
     };
 
     setDocumentNonBlocking(vehicleRef, vehicleData, { merge: true });
@@ -107,6 +109,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
           plate: '',
           fuelCapacityLiters: undefined,
           averageConsumptionKmPerLiter: undefined,
+          imageUrl: '',
         });
     }
   }
@@ -190,6 +193,23 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
                     </FormItem>
                 )} />
             </div>
+            <FormField
+              control={form.control}
+              name="imageUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL de la Imagen (Opcional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="https://example.com/image.png"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
            
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting} className="w-full">
