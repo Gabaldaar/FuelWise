@@ -1,25 +1,22 @@
 
 'use client';
 
-import type { ServiceReminder } from '@/lib/types';
+import type { ServiceReminder, ProcessedFuelLog } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Wrench, Calendar, Gauge, Edit } from 'lucide-react';
+import { Plus, Wrench, Calendar, Gauge, Edit, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
-import { useState } from 'react';
 import AddServiceReminderDialog from '@/components/dashboard/add-service-reminder-dialog';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { useToast } from '@/hooks/use-toast';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
+import DeleteServiceReminderDialog from '@/components/dashboard/delete-service-reminder-dialog';
 
 export default function ServicesPage() {
   const { selectedVehicle: vehicle } = useVehicles();
   const { user } = useUser();
   const firestore = useFirestore();
-  const { toast } = useToast();
 
   const remindersQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
@@ -29,24 +26,31 @@ export default function ServicesPage() {
     );
   }, [firestore, user, vehicle]);
 
+  const lastFuelLogQuery = useMemoFirebase(() => {
+    if (!user || !vehicle) return null;
+    return query(
+      collection(firestore, 'vehicles', vehicle.id, 'fuel_records'),
+      orderBy('odometer', 'desc'),
+      limit(1)
+    );
+  }, [firestore, user, vehicle]);
+
   const { data: reminders, isLoading } = useCollection<ServiceReminder>(remindersQuery);
-  
-  const handleReminderDelete = (reminderId: string) => {
-    if (!user || !vehicle) return;
-    const reminderRef = doc(firestore, 'vehicles', vehicle.id, 'service_reminders', reminderId);
-    deleteDocumentNonBlocking(reminderRef);
-    toast({
-        title: "Recordatorio Completado",
-        description: "El recordatorio de servicio ha sido marcado como completado."
-    })
-  };
-  
+  const { data: lastFuelLog, isLoading: isLoadingLastLog } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
+
   if (!vehicle) {
     return <div className="text-center">Por favor, seleccione un vehículo.</div>;
   }
-  
+
+  const lastOdometer = lastFuelLog?.[0]?.odometer || 0;
+
   const vehicleServiceReminders = (reminders || [])
     .sort((a, b) => (a.isUrgent === b.isUrgent ? 0 : a.isUrgent ? -1 : 1));
+  
+  const getKmsRemaining = (dueOdometer: number) => {
+    if (!lastOdometer || !dueOdometer) return null;
+    return dueOdometer - lastOdometer;
+  }
 
   return (
     <Card>
@@ -64,13 +68,15 @@ export default function ServicesPage() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-            {isLoading ? (
+            {(isLoading || isLoadingLastLog) ? (
                 <div className="flex flex-col items-center justify-center h-48 rounded-lg border-2 border-dashed">
                     <Wrench className="h-12 w-12 text-muted-foreground animate-pulse" />
                     <p className="mt-4 text-muted-foreground">Cargando recordatorios...</p>
                 </div>
             ) : vehicleServiceReminders.length > 0 ? (
-                vehicleServiceReminders.map((reminder: ServiceReminder) => (
+                vehicleServiceReminders.map((reminder: ServiceReminder) => {
+                  const kmsRemaining = reminder.dueOdometer ? getKmsRemaining(reminder.dueOdometer) : null;
+                  return (
                     <div key={reminder.id} className="flex items-start gap-4 rounded-lg border p-4">
                         <div className="flex-shrink-0 pt-1">
                             <Wrench className="h-6 w-6 text-muted-foreground" />
@@ -81,7 +87,7 @@ export default function ServicesPage() {
                                 {reminder.isUrgent && <Badge variant="destructive">Urgente</Badge>}
                             </div>
                             <p className="text-muted-foreground mt-1">{reminder.notes}</p>
-                            <div className="text-sm text-muted-foreground flex items-center gap-6 mt-2">
+                            <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-6 gap-y-2 mt-2">
                                 {reminder.dueDate && (
                                 <span className='flex items-center gap-1.5'>
                                     <Calendar className="h-4 w-4" />
@@ -94,6 +100,15 @@ export default function ServicesPage() {
                                     {reminder.dueOdometer.toLocaleString()} km
                                 </span>
                                 )}
+                                {kmsRemaining !== null && (
+                                  <span className={`flex items-center gap-1.5 font-medium ${kmsRemaining < 0 ? 'text-destructive' : 'text-amber-600'}`}>
+                                    <AlertTriangle className="h-4 w-4" />
+                                    {kmsRemaining < 0 
+                                      ? `Vencido hace ${Math.abs(kmsRemaining).toLocaleString()} km`
+                                      : `Faltan ${kmsRemaining.toLocaleString()} km`
+                                    }
+                                  </span>
+                                )}
                             </div>
                         </div>
                         <div className='flex items-center gap-2'>
@@ -103,10 +118,11 @@ export default function ServicesPage() {
                                     <span className="sr-only">Editar</span>
                                 </Button>
                              </AddServiceReminderDialog>
-                             <Button variant="outline" size="sm" onClick={() => handleReminderDelete(reminder.id)}>Completar</Button>
+                             <DeleteServiceReminderDialog vehicleId={vehicle.id} reminderId={reminder.id} />
                         </div>
                     </div>
-                ))
+                  )
+                })
             ) : (
               <div className="flex flex-col items-center justify-center h-48 rounded-lg border-2 border-dashed">
                 <Wrench className="h-12 w-12 text-muted-foreground" />
