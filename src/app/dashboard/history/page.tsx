@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { ProcessedFuelLog, ServiceReminder, TimelineItem, ProcessedServiceReminder } from '@/lib/types';
+import type { ProcessedFuelLog, ServiceReminder, TimelineItem, ProcessedServiceReminder, Vehicle } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
@@ -113,18 +113,26 @@ export default function HistoryPage() {
         timelineDate = reminder.completedDate;
       } else if (reminder.dueOdometer) {
         sortKey = reminder.dueOdometer;
-        timelineDate = reminder.dueDate;
+        timelineDate = reminder.dueDate; // Can be null, that's OK
       } else if (reminder.dueDate) {
-        // Fallback to date if no odometer is present, using timestamp as sort key
+        // Fallback for time-based reminders: convert date to a timestamp for sorting
         sortKey = new Date(reminder.dueDate).getTime();
         timelineDate = reminder.dueDate;
       }
 
-      if (sortKey !== null && timelineDate) {
+      // Ensure every reminder gets added, even if it lacks a specific date or odometer
+      if (sortKey === null && !timelineDate) {
+          // If a reminder has no due date or odometer (should be rare), place it at the top based on creation
+          sortKey = new Date().getTime();
+          timelineDate = new Date().toISOString();
+      }
+
+      if (sortKey !== null) {
         combined.push({
           type: 'service',
           sortKey: sortKey,
-          date: timelineDate,
+          // If timelineDate is null (e.g., odometer-only reminder), provide a fallback for display
+          date: timelineDate || new Date().toISOString(), 
           data: processedReminder,
         });
       }
@@ -158,7 +166,7 @@ export default function HistoryPage() {
               {timelineItems.map((item, index) => (
                 <AccordionItem value={`${item.type}-${'id' in item.data ? item.data.id : index}-${index}`} key={`${item.type}-${'id' in item.data ? item.data.id : index}-${index}`}>
                     {item.type === 'fuel' ? (
-                      <FuelLogItemContent log={item.data as ProcessedFuelLog} vehicle={vehicle} lastLog={lastLogForNewEntry} />
+                      <FuelLogItemContent log={item.data as ProcessedFuelLog} vehicle={vehicle as Vehicle} lastLog={lastLogForNewEntry} />
                     ) : (
                       <ServiceItemContent reminder={item.data as ProcessedServiceReminder} vehicleId={vehicle.id} lastOdometer={lastOdometer}/>
                     )}
@@ -178,7 +186,7 @@ export default function HistoryPage() {
 }
 
 
-function FuelLogItemContent({ log, vehicle, lastLog }: { log: ProcessedFuelLog, vehicle: any, lastLog?: ProcessedFuelLog }) {
+function FuelLogItemContent({ log, vehicle, lastLog }: { log: ProcessedFuelLog, vehicle: Vehicle, lastLog?: ProcessedFuelLog }) {
   return (
     <>
       <AccordionTrigger className="px-6 py-4 text-left hover:no-underline">
@@ -318,3 +326,5 @@ function ServiceItemContent({ reminder, vehicleId, lastOdometer }: { reminder: P
     </>
   )
 }
+
+    
