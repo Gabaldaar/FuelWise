@@ -19,25 +19,69 @@ interface CompletedTripsProps {
 
 function TripDetails({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehicle, allFuelLogs: ProcessedFuelLog[] }) {
     const { getFormattedConsumption, consumptionUnit } = usePreferences();
-    const kmTraveled = trip.endOdometer && trip.startOdometer ? trip.endOdometer - trip.startOdometer : 0;
     
-    const {
-        fuelConsumed,
-        totalCost,
-        avgConsumptionForTrip,
-        costPerKm,
-        duration
-    } = useMemo(() => {
-        if (kmTraveled <= 0) return { fuelConsumed: 0, totalCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A" };
+    const tripCalculations = useMemo(() => {
+        if (!trip.endOdometer || !trip.startOdometer) {
+            return { kmTraveled: 0, fuelConsumed: 0, totalCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A" };
+        }
+        const kmTraveled = trip.endOdometer - trip.startOdometer;
+        if (kmTraveled <= 0) {
+            return { kmTraveled: 0, fuelConsumed: 0, totalCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A" };
+        }
 
-        const sortedLogs = [...allFuelLogs].sort((a, b) => a.odometer - b.odometer);
-        const avgPricePerLiter = sortedLogs.length > 0 ? sortedLogs.reduce((acc, log) => acc + log.pricePerLiter, 0) / sortedLogs.length : 0;
+        // --- Advanced Calculation Logic ---
         
-        const vehicleAvgConsumption = vehicle.averageConsumptionKmPerLiter;
-        if (vehicleAvgConsumption <= 0) return { fuelConsumed: 0, totalCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A" };
+        // 1. Sort all logs by odometer ascending
+        const sortedLogs = [...allFuelLogs].sort((a, b) => a.odometer - b.odometer);
+        
+        // 2. Find logs that happened *during* this trip
+        const logsInTrip = sortedLogs.filter(log => log.odometer > trip.startOdometer! && log.odometer < trip.endOdometer!);
 
-        const fuelConsumed = kmTraveled / vehicleAvgConsumption;
-        const totalCost = fuelConsumed * avgPricePerLiter;
+        // 3. Create segments for calculation
+        const keyOdometerPoints = [trip.startOdometer, ...logsInTrip.map(l => l.odometer), trip.endOdometer];
+        
+        let totalFuel = 0;
+        let totalCost = 0;
+
+        // Use overall vehicle avg consumption and price as fallback
+        const fallbackConsumption = vehicle.averageConsumptionKmPerLiter > 0 ? vehicle.averageConsumptionKmPerLiter : 1; // Avoid division by zero
+        const historicAvgPrice = sortedLogs.length > 0 ? sortedLogs.reduce((acc, log) => acc + log.pricePerLiter, 0) / sortedLogs.length : 0;
+        
+        for (let i = 0; i < keyOdometerPoints.length - 1; i++) {
+            const segmentStartOdo = keyOdometerPoints[i];
+            const segmentEndOdo = keyOdometerPoints[i+1];
+            const segmentDistance = segmentEndOdo - segmentStartOdo;
+
+            if (segmentDistance <= 0) continue;
+
+            // Find the log corresponding to the start of this segment.
+            // If segmentStartOdo is the trip's start, there's no log.
+            const segmentStartLog = logsInTrip.find(l => l.odometer === segmentStartOdo);
+            
+            // For segments starting with a fill-up, we can calculate real consumption
+            if (segmentStartLog && segmentStartLog.isFillUp && !segmentStartLog.missedPreviousFillUp) {
+                // Find previous log in the full history to get consumption
+                const logIndex = sortedLogs.findIndex(l => l.id === segmentStartLog.id);
+                if (logIndex > 0) {
+                    const prevLog = sortedLogs[logIndex - 1];
+                    const distanceSinceLastFill = segmentStartLog.odometer - prevLog.odometer;
+                    if (distanceSinceLastFill > 0 && prevLog.isFillUp) {
+                        const realConsumption = distanceSinceLastFill / segmentStartLog.liters;
+                        if (realConsumption > 0) {
+                            totalFuel += segmentDistance / realConsumption;
+                            totalCost += (segmentDistance / realConsumption) * segmentStartLog.pricePerLiter;
+                            continue; // Move to next segment
+                        }
+                    }
+                }
+            }
+            
+            // Fallback for first segment, last segment, or segments without precise data
+            totalFuel += segmentDistance / fallbackConsumption;
+            totalCost += (segmentDistance / fallbackConsumption) * historicAvgPrice;
+        }
+
+        const finalAvgConsumption = kmTraveled / totalFuel;
         const costPerKm = totalCost / kmTraveled;
 
         let duration = "N/A";
@@ -48,14 +92,16 @@ function TripDetails({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehi
         }
 
         return {
-            fuelConsumed,
-            totalCost,
-            avgConsumptionForTrip: vehicleAvgConsumption,
-            costPerKm,
-            duration
+            kmTraveled,
+            fuelConsumed: totalFuel,
+            totalCost: totalCost,
+            avgConsumptionForTrip: finalAvgConsumption,
+            costPerKm: costPerKm,
+            duration: duration
         }
-    }, [trip, allFuelLogs, kmTraveled, vehicle.averageConsumptionKmPerLiter]);
+    }, [trip, allFuelLogs, vehicle.averageConsumptionKmPerLiter]);
 
+    const { kmTraveled, fuelConsumed, totalCost, avgConsumptionForTrip, costPerKm, duration } = tripCalculations;
 
     return (
         <div className="space-y-3 pt-4 border-t pl-12">
