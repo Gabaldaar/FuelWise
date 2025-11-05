@@ -48,7 +48,7 @@ const formSchema = z.object({
   isUrgent: z.boolean().default(false),
 }).refine(data => data.dueDate || data.dueOdometer, {
   message: "Debes especificar al menos una fecha o un odómetro.",
-  path: ["dueDate"], 
+  path: ["serviceType"], // Assign error to a field that is always present to avoid confusion
 });
 
 type FormValues = z.infer<typeof formSchema>;
