@@ -1,6 +1,9 @@
+'use client';
+
 import type { Metadata } from 'next';
-import { vehicles, fuelLogs } from '@/lib/data';
-import type { ProcessedFuelLog, Vehicle } from '@/lib/types';
+import { fuelLogs } from '@/lib/data';
+import type { ProcessedFuelLog } from '@/lib/types';
+import { useVehicles } from '@/context/vehicle-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -13,9 +16,11 @@ import {
 import { formatDate } from '@/lib/utils';
 import AddFuelLogDialog from '@/components/dashboard/add-fuel-log-dialog';
 
+/*
 export const metadata: Metadata = {
   title: 'Registros de Combustible - FuelWise',
 };
+*/
 
 function processFuelLogs(logs: typeof fuelLogs, vehicleId: string): ProcessedFuelLog[] {
   const vehicleLogs = logs
@@ -37,13 +42,8 @@ function processFuelLogs(logs: typeof fuelLogs, vehicleId: string): ProcessedFue
   });
 }
 
-export default function LogsPage({
-  searchParams,
-}: {
-  searchParams?: { vehicle?: string };
-}) {
-  const currentVehicleId = searchParams?.vehicle || vehicles[0]?.id || '';
-  const vehicle = vehicles.find(v => v.id === currentVehicleId) as Vehicle | undefined;
+export default function LogsPage() {
+  const { selectedVehicle: vehicle } = useVehicles();
   
   if (!vehicle) {
     return <div className="text-center">Por favor, seleccione un vehículo.</div>;

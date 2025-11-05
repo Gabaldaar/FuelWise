@@ -1,23 +1,16 @@
-import type { Metadata } from 'next';
-import { vehicles, serviceReminders } from '@/lib/data';
-import type { Vehicle, ServiceReminder } from '@/lib/types';
+'use client';
+
+import { serviceReminders } from '@/lib/data';
+import type { ServiceReminder } from '@/lib/types';
+import { useVehicles } from '@/context/vehicle-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Wrench, Calendar, Gauge } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
 
-export const metadata: Metadata = {
-  title: 'Servicios y Mantenimiento - FuelWise',
-};
-
-export default function ServicesPage({
-  searchParams,
-}: {
-  searchParams?: { vehicle?: string };
-}) {
-  const currentVehicleId = searchParams?.vehicle || vehicles[0]?.id || '';
-  const vehicle = vehicles.find(v => v.id === currentVehicleId) as Vehicle | undefined;
+export default function ServicesPage() {
+  const { selectedVehicle: vehicle } = useVehicles();
   
   if (!vehicle) {
     return <div className="text-center">Por favor, seleccione un vehículo.</div>;

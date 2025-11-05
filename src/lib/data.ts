@@ -1,6 +1,6 @@
 import type { Vehicle, FuelLog, ServiceReminder } from './types';
 
-export const vehicles: Vehicle[] = [
+export const initialVehicles: Vehicle[] = [
   {
     id: 'vehicle-1',
     make: 'Toyota',

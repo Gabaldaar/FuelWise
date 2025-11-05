@@ -1,9 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Check, ChevronsUpDown, Car } from 'lucide-react';
-import { vehicles } from '@/lib/data';
+import { useVehicles } from '@/context/vehicle-context';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,18 +21,16 @@ import {
 
 export default function VehicleSelector() {
   const [open, setOpen] = React.useState(false);
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const currentVehicleId = searchParams.get('vehicle') || vehicles[0]?.id;
-  const selectedVehicle = vehicles.find((v) => v.id === currentVehicleId);
+  const { vehicles, selectedVehicle, selectVehicle } = useVehicles();
 
   const handleSelect = (vehicleId: string) => {
-    const params = new URLSearchParams(searchParams);
-    params.set('vehicle', vehicleId);
-    router.replace(`${pathname}?${params.toString()}`);
+    selectVehicle(vehicleId);
     setOpen(false);
   };
+
+  if (!vehicles.length) {
+    return null;
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -68,7 +65,7 @@ export default function VehicleSelector() {
                   <Check
                     className={cn(
                       'mr-2 h-4 w-4',
-                      currentVehicleId === vehicle.id ? 'opacity-100' : 'opacity-0'
+                      selectedVehicle?.id === vehicle.id ? 'opacity-100' : 'opacity-0'
                     )}
                   />
                   {vehicle.make} {vehicle.model} ({vehicle.plate})

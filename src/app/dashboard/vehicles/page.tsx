@@ -1,9 +1,7 @@
-
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
-import { vehicles as initialVehicles } from '@/lib/data';
+import { useVehicles } from '@/context/vehicle-context';
 import type { Vehicle } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,19 +10,19 @@ import AddVehicleDialog from '@/components/dashboard/add-vehicle-dialog';
 import DeleteVehicleDialog from '@/components/dashboard/delete-vehicle-dialog';
 
 export default function VehiclesPage() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
+  const { vehicles, addVehicle, updateVehicle, deleteVehicle } = useVehicles();
 
   const handleVehicleUpdate = (vehicle: Vehicle) => {
     const isEditing = vehicles.some(v => v.id === vehicle.id);
     if (isEditing) {
-      setVehicles(vehicles.map(v => v.id === vehicle.id ? vehicle : v));
+      updateVehicle(vehicle);
     } else {
-      setVehicles([...vehicles, vehicle]);
+      addVehicle(vehicle);
     }
   };
 
   const handleVehicleDelete = (vehicleId: string) => {
-    setVehicles(vehicles.filter(v => v.id !== vehicleId));
+    deleteVehicle(vehicleId);
   };
 
   return (

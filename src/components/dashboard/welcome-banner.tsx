@@ -24,7 +24,7 @@ export default function WelcomeBanner({ vehicle }: WelcomeBannerProps) {
                     <p className="text-muted-foreground mb-4">
                         Aquí tienes un resumen del rendimiento y los próximos mantenimientos de tu vehículo. Añade un nuevo repostaje para mantener tus datos al día.
                     </p>
-                   <AddFuelLogDialog vehicleId={vehicle.id} />
+                   {vehicle && <AddFuelLogDialog vehicleId={vehicle.id} />}
                 </CardContent>
             </div>
              {vehicle.imageUrl && (

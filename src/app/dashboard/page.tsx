@@ -1,17 +1,15 @@
+'use client';
+
 import { Suspense } from 'react';
-import type { Metadata } from 'next';
-import { fuelLogs, serviceReminders, vehicles } from '@/lib/data';
-import type { ProcessedFuelLog, Vehicle } from '@/lib/types';
+import { fuelLogs, serviceReminders } from '@/lib/data';
+import type { ProcessedFuelLog } from '@/lib/types';
 import WelcomeBanner from '@/components/dashboard/welcome-banner';
 import StatCard from '@/components/dashboard/stat-card';
 import FuelConsumptionChart from '@/components/dashboard/fuel-consumption-chart';
 import ServiceReminders from '@/components/dashboard/service-reminders';
 import FuelEstimate from '@/components/dashboard/fuel-estimate';
 import RecentFuelLogs from '@/components/dashboard/recent-fuel-logs';
-
-export const metadata: Metadata = {
-  title: 'Dashboard - FuelWise',
-};
+import { useVehicles } from '@/context/vehicle-context';
 
 // This function would typically live in a data-access layer or lib folder
 function processFuelLogs(logs: typeof fuelLogs, vehicleId: string): ProcessedFuelLog[] {
@@ -35,13 +33,8 @@ function processFuelLogs(logs: typeof fuelLogs, vehicleId: string): ProcessedFue
   });
 }
 
-export default function DashboardPage({
-  searchParams,
-}: {
-  searchParams?: { vehicle?: string };
-}) {
-  const currentVehicleId = searchParams?.vehicle || vehicles[0]?.id || '';
-  const vehicle = vehicles.find(v => v.id === currentVehicleId) as Vehicle | undefined;
+export default function DashboardPage() {
+  const { selectedVehicle: vehicle } = useVehicles();
 
   if (!vehicle) {
     return <div className="text-center">Por favor, seleccione un vehículo.</div>;
