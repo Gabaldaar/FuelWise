@@ -142,25 +142,45 @@ export default function DashboardPage() {
   const getNextServiceValue = () => {
     if (!nextService) return { value: 'N/A', description: 'Todo en orden' };
     
-    if (nextService.dueDate && nextService.dueOdometer) {
-       return { 
-        value: formatDate(nextService.dueDate),
-        description: `o a los ${nextService.dueOdometer.toLocaleString()} km`
-      };
+    let mainValue = 'Revisar';
+    let description = nextService.serviceType;
+
+    if (nextService.dueOdometer && nextService.dueDate) {
+        // If both exist, prioritize whichever is closer.
+        const kmRatio = nextService.kmsRemaining !== null ? nextService.kmsRemaining / (nextService.recurrenceIntervalKm || 5000) : 1;
+        const dayRatio = nextService.daysRemaining !== null ? nextService.daysRemaining / 30 : 1; // Assuming ~30 days for a time-based service
+        if (kmRatio <= dayRatio) {
+            mainValue = `${nextService.dueOdometer.toLocaleString()} km`;
+        } else {
+            mainValue = formatDate(nextService.dueDate);
+        }
+    } else if (nextService.dueOdometer) {
+        mainValue = `${nextService.dueOdometer.toLocaleString()} km`;
+    } else if (nextService.dueDate) {
+        mainValue = formatDate(nextService.dueDate);
     }
-    if (nextService.dueDate) {
-      return { 
-        value: formatDate(nextService.dueDate), 
-        description: nextService.serviceType 
-      };
+    
+    let remainingDesc = [];
+    if (nextService.kmsRemaining !== null) {
+        if (nextService.kmsRemaining <= 0) {
+            remainingDesc.push(`Vencido por ${Math.abs(nextService.kmsRemaining).toLocaleString()} km`);
+        } else {
+            remainingDesc.push(`Faltan ${nextService.kmsRemaining.toLocaleString()} km`);
+        }
     }
-    if (nextService.dueOdometer) {
-      return { 
-        value: `${nextService.dueOdometer.toLocaleString()} km`, 
-        description: nextService.serviceType 
-      };
+     if (nextService.daysRemaining !== null) {
+        if (nextService.daysRemaining < 0) {
+            remainingDesc.push(`Vencido hace ${Math.abs(nextService.daysRemaining)} días`);
+        } else {
+            remainingDesc.push(`Faltan ${nextService.daysRemaining} días`);
+        }
     }
-    return { value: 'Revisar', description: nextService.serviceType };
+    
+    if (remainingDesc.length > 0) {
+        description = remainingDesc.join(' o ');
+    }
+
+    return { value: mainValue, description };
   };
 
   const nextServiceInfo = getNextServiceValue();
