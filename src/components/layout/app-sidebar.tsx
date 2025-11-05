@@ -14,9 +14,9 @@ import {
 
 const menuItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  // { href: '/dashboard/logs', label: 'Registros', icon: Fuel },
-  // { href: '/dashboard/services', label: 'Servicios', icon: Wrench },
-  // { href: '/dashboard/vehicles', label: 'Vehículos', icon: Car },
+  { href: '/dashboard/logs', label: 'Registros', icon: Fuel },
+  { href: '/dashboard/services', label: 'Servicios', icon: Wrench },
+  { href: '/dashboard/vehicles', label: 'Vehículos', icon: Car },
 ];
 
 export default function AppSidebar() {
@@ -36,7 +36,7 @@ export default function AppSidebar() {
             <SidebarMenuItem key={item.href}>
               <Link href={item.href}>
                 <SidebarMenuButton
-                  isActive={pathname === item.href}
+                  isActive={pathname.startsWith(item.href) && (item.href === '/dashboard' ? pathname === item.href : true)}
                   tooltip={{ children: item.label }}
                 >
                   <item.icon />
@@ -50,5 +50,3 @@ export default function AppSidebar() {
     </>
   );
 }
-
-    
