@@ -167,6 +167,36 @@
         "dueOdometerReading",
         "isCompleted"
       ]
+    },
+    "FuelType": {
+        "title": "FuelType",
+        "description": "Represents a user-configurable fuel type.",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string", "description": "Unique identifier." },
+            "name": { "type": "string", "description": "Name of the fuel type (e.g., 'Gasolina Premium')." }
+        },
+        "required": ["id", "name"]
+    },
+    "ServiceType": {
+        "title": "ServiceType",
+        "description": "Represents a user-configurable service type.",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string", "description": "Unique identifier." },
+            "name": { "type": "string", "description": "Name of the service (e.g., 'Rotación de neumáticos')." }
+        },
+        "required": ["id", "name"]
+    },
+    "GasStation": {
+        "title": "GasStation",
+        "description": "Represents a user-configurable gas station.",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string", "description": "Unique identifier." },
+            "name": { "type": "string", "description": "Name of the gas station (e.g., 'Shell Av. Principal')." }
+        },
+        "required": ["id", "name"]
     }
   },
   "auth": {
@@ -260,8 +290,20 @@
             }
           ]
         }
+      },
+      {
+          "path": "/users/{userId}/fuel_types/{fuelTypeId}",
+          "definition": { "entityName": "FuelType", "schema": { "$ref": "#/backend/entities/FuelType" } }
+      },
+      {
+          "path": "/users/{userId}/service_types/{serviceTypeId}",
+          "definition": { "entityName": "ServiceType", "schema": { "$ref": "#/backend/entities/ServiceType" } }
+      },
+      {
+          "path": "/users/{userId}/gas_stations/{gasStationId}",
+          "definition": { "entityName": "GasStation", "schema": { "$ref": "#/backend/entities/GasStation" } }
       }
     ],
-    "reasoning": "The Firestore structure is designed to ensure data consistency, security, and scalability for the FuelWise application.  The core principle is Authorization Independence achieved through path-based ownership and denormalization where required.  Vehicles and FuelRecords are structured as subcollections of the user document to ensure only the owner has access.  The structure facilitates secure `list` operations (QAPs) as each collection's documents share the same security requirements, and access is controlled through the user's `uid` and path-based rules.\n\nSpecifically:\n\n*   `/users/{userId}/vehicles/{vehicleId}`:  This path enforces that vehicles are owned by a specific user. Security rules can simply check that `request.auth.uid == userId` to ensure ownership.\n*   `/users/{userId}/vehicles/{vehicleId}/fuel_records/{fuelRecordId}`: This path ensures that fuel records are owned by a specific vehicle, which is owned by a specific user. Security rules can check that the request is made by the owner of the vehicle.\n*   `/users/{userId}/vehicles/{vehicleId}/service_reminders/{serviceReminderId}`: Same ownership and security pattern as fuel records.\n\nThis approach avoids any `get()` calls in the security rules, enabling atomic operations (transactions/batches) and easier debugging.\n"
+    "reasoning": "The Firestore structure is designed to ensure data consistency, security, and scalability for the FuelWise application.  The core principle is Authorization Independence achieved through path-based ownership and denormalization where required.  Vehicles and FuelRecords are structured as subcollections of the user document to ensure only the owner has access.  The structure facilitates secure `list` operations (QAPs) as each collection's documents share the same security requirements, and access is controlled through the user's `uid` and path-based rules.\n\nSpecifically:\n\n*   `/users/{userId}/vehicles/{vehicleId}`:  This path enforces that vehicles are owned by a specific user. Security rules can simply check that `request.auth.uid == userId` to ensure ownership.\n*   `/users/{userId}/vehicles/{vehicleId}/fuel_records/{fuelRecordId}`: This path ensures that fuel records are owned by a specific vehicle, which is owned by a specific user. Security rules can check that the request is made by the owner of the vehicle.\n*   `/users/{userId}/vehicles/{vehicleId}/service_reminders/{serviceReminderId}`: Same ownership and security pattern as fuel records.\n*   The new configuration collections (`fuel_types`, `service_types`, `gas_stations`) are also nested under the user to enforce ownership, allowing each user to have their own customized lists.\n\nThis approach avoids any `get()` calls in the security rules, enabling atomic operations (transactions/batches) and easier debugging.\n"
   }
 }

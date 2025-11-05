@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Car, Fuel, LayoutDashboard, Leaf, Wrench } from 'lucide-react';
+import { Car, Fuel, LayoutDashboard, Leaf, Settings, Wrench } from 'lucide-react';
 
 import {
   SidebarContent,
@@ -17,6 +17,7 @@ const menuItems = [
   { href: '/dashboard/logs', label: 'Registros', icon: Fuel },
   { href: '/dashboard/services', label: 'Servicios', icon: Wrench },
   { href: '/dashboard/vehicles', label: 'Vehículos', icon: Car },
+  { href: '/dashboard/settings', label: 'Configuración', icon: Settings },
 ];
 
 export default function AppSidebar() {

@@ -45,3 +45,8 @@ export type User = {
   email: string;
   username: string;
 };
+
+export type ConfigItem = {
+  id: string;
+  name: string;
+};
