@@ -16,7 +16,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -39,7 +38,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { useUser, useFirestore } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -269,6 +268,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, children
                             />
                             </PopoverContent>
                         </Popover>
+                         {lastLog && <FormDescription>Última: {formatDate(lastLog.date)}</FormDescription>}
                         <FormMessage />
                     </FormItem>
                 )}
