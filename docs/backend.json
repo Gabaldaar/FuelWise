@@ -171,6 +171,18 @@
         "serviceLocation": {
             "type": "string",
             "description": "Location where the service was performed."
+        },
+        "cost": {
+          "type": "number",
+          "description": "Cost of the completed service."
+        },
+        "isRecurring": {
+          "type": "boolean",
+          "description": "Indicates if the service reminder is recurring."
+        },
+        "recurrenceIntervalKm": {
+          "type": "number",
+          "description": "The interval in kilometers for the recurrence."
         }
       },
       "required": [

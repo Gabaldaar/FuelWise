@@ -5,7 +5,7 @@ import type { ServiceReminder, ProcessedFuelLog } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Wrench, Calendar, Gauge, Edit, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Plus, Wrench, Calendar, Gauge, Edit, AlertTriangle, CheckCircle2, Repeat, DollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
 import AddServiceReminderDialog from '@/components/dashboard/add-service-reminder-dialog';
@@ -45,8 +45,7 @@ export default function ServicesPage() {
 
   const lastOdometer = lastFuelLog?.[0]?.odometer || 0;
   
-  // Custom sort since Firestore can't do complex sorting with inequalities
-  const sortedReminders = (reminders || []).sort((a, b) => {
+  const sortedReminders = [...(reminders || [])].sort((a, b) => {
     if (a.isCompleted && !b.isCompleted) return 1;
     if (!a.isCompleted && b.isCompleted) return -1;
     
@@ -54,15 +53,17 @@ export default function ServicesPage() {
     if (!a.isCompleted && !b.isCompleted) {
       const aUrgency = a.dueOdometer ? a.dueOdometer - lastOdometer : Infinity;
       const bUrgency = b.dueOdometer ? b.dueOdometer - lastOdometer : Infinity;
+      
+      // If one has odometer and is past due, it's more urgent
+      if (aUrgency < 0 && bUrgency >= 0) return -1;
+      if (bUrgency < 0 && aUrgency >= 0) return 1;
+
+      // If both have odometer, sort by that
+      if (a.dueOdometer && b.dueOdometer) return aUrgency - bUrgency;
+      
+      // Otherwise sort by date
       const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
       const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-      
-      // If both have odometer due, sort by that
-      if (a.dueOdometer && b.dueOdometer) return aUrgency - bUrgency;
-      // If one has odometer and is past due, it's more urgent
-      if (aUrgency < 0 && bUrgency > 0) return -1;
-      if (bUrgency < 0 && aUrgency > 0) return 1;
-      // Otherwise sort by date
       return aDate - bDate;
     }
     
@@ -118,7 +119,10 @@ export default function ServicesPage() {
                                 <p className={cn("font-semibold text-lg", { "line-through": reminder.isCompleted })}>
                                   {reminder.serviceType}
                                 </p>
-                                {reminder.isUrgent && !reminder.isCompleted && <Badge variant="destructive">Urgente</Badge>}
+                                <div className="flex items-center gap-2">
+                                  {reminder.isRecurring && !reminder.isCompleted && <Badge variant="outline" className="flex items-center gap-1"><Repeat className="h-3 w-3"/> Recurrente</Badge>}
+                                  {reminder.isUrgent && !reminder.isCompleted && <Badge variant="destructive">Urgente</Badge>}
+                                </div>
                             </div>
                             <p className="text-muted-foreground mt-1">{reminder.notes}</p>
                             
@@ -137,16 +141,25 @@ export default function ServicesPage() {
                                           a los {reminder.completedOdometer.toLocaleString()} km
                                       </span>
                                     )}
-                                    {reminder.serviceLocation && (
+                                    {reminder.cost && (
+                                       <span className='flex items-center gap-1.5'>
+                                          <DollarSign className="h-4 w-4" />
+                                          Costo: ${reminder.cost.toFixed(2)}
+                                      </span>
+                                    )}
+                                  </div>
+                                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                                     {reminder.serviceLocation && (
                                       <span className='flex items-center gap-1.5'>
                                           <Wrench className="h-4 w-4" />
                                           en {reminder.serviceLocation}
                                       </span>
                                     )}
                                   </div>
-                                  {reminder.dueOdometer && (
+                                  {(reminder.dueOdometer || reminder.isRecurring) && (
                                     <p className="text-xs italic mt-1">
-                                      (Programado originalmente para los {reminder.dueOdometer.toLocaleString()} km)
+                                      {reminder.isRecurring && `Servicio recurrente cada ${reminder.recurrenceIntervalKm?.toLocaleString()} km. `}
+                                      {reminder.dueOdometer && `(Programado para los ${reminder.dueOdometer.toLocaleString()} km)`}
                                     </p>
                                   )}
                                 </div>

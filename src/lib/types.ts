@@ -39,6 +39,9 @@ export type ServiceReminder = {
   completedDate?: string;
   completedOdometer?: number;
   serviceLocation?: string;
+  cost?: number;
+  isRecurring?: boolean;
+  recurrenceIntervalKm?: number;
 };
 
 export type ProcessedFuelLog = FuelLog & {
