@@ -52,6 +52,8 @@ export type ProcessedFuelLog = FuelLog & {
 
 // This type is for client-side processing only
 export type ProcessedServiceReminder = ServiceReminder & {
+    kmsRemaining?: number | null;
+    daysRemaining?: number | null;
     isUrgent?: boolean;
     isOverdue?: boolean;
 };

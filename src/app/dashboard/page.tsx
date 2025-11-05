@@ -119,7 +119,7 @@ export default function DashboardPage() {
             (daysRemaining !== null && daysRemaining <= urgencyThresholdDays)
         );
 
-        return { ...r, isOverdue, isUrgent };
+        return { ...r, kmsRemaining, daysRemaining, isOverdue, isUrgent };
     });
 
   const sortedPendingReminders = [...pendingReminders].sort((a, b) => {
@@ -191,7 +191,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
-           <ServiceReminders data={pendingReminders} />
+           <ServiceReminders data={sortedPendingReminders} />
         </div>
         <div className="lg:col-span-2">
           
