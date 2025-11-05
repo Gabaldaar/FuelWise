@@ -208,22 +208,28 @@ export default function ServicesPage() {
                                     )}
                                   </div>
                                   
-                                  <div className={cn('flex flex-wrap items-center gap-1.5 font-medium', {
+                                  <div className={cn('flex flex-col sm:flex-row items-start sm:items-center gap-1.5 font-medium', {
                                     'text-destructive': reminder.isOverdue,
                                     'text-amber-600': reminder.isUrgent,
                                     'text-muted-foreground/80': !reminder.isOverdue && !reminder.isUrgent
                                   })}>
-                                    <AlertTriangle className="h-4 w-4" />
-                                    
-                                    {reminder.kmsRemaining !== null && reminder.kmsRemaining < 0 
-                                      ? `Vencido hace ${Math.abs(reminder.kmsRemaining).toLocaleString()} km`
-                                      : reminder.kmsRemaining !== null ? `Faltan ${reminder.kmsRemaining.toLocaleString()} km` : ''
-                                    }
-                                    {(reminder.kmsRemaining !== null && reminder.daysRemaining !== null && (reminder.kmsRemaining < 0 || reminder.daysRemaining < 0)) ? ' o ' : (reminder.kmsRemaining !== null && reminder.daysRemaining !== null ? ' / ' : '')}
+                                    <div className="flex items-center gap-1.5">
+                                      <AlertTriangle className="h-4 w-4" />
+                                      {reminder.kmsRemaining !== null && reminder.kmsRemaining < 0 
+                                        ? `Vencido hace ${Math.abs(reminder.kmsRemaining).toLocaleString()} km`
+                                        : reminder.kmsRemaining !== null ? `Faltan ${reminder.kmsRemaining.toLocaleString()} km` : ''
+                                      }
+                                    </div>
+                                    <span className="hidden sm:block">
+                                       {(reminder.kmsRemaining !== null && reminder.daysRemaining !== null) && '/'}
+                                    </span>
+                                    <div className="flex items-center gap-1.5 sm:pl-0">
+                                      {reminder.daysRemaining !== null && <AlertTriangle className="h-4 w-4 sm:hidden" />}
                                       {reminder.daysRemaining !== null && reminder.daysRemaining < 0 
-                                      ? `Vencido hace ${Math.abs(reminder.daysRemaining)} días`
-                                      : reminder.daysRemaining !== null ? `Faltan ${reminder.daysRemaining} días` : ''
-                                    }
+                                        ? `Vencido hace ${Math.abs(reminder.daysRemaining)} días`
+                                        : reminder.daysRemaining !== null ? `Faltan ${reminder.daysRemaining} días` : ''
+                                      }
+                                    </div>
                                   </div>
                               </div>
                             )}

@@ -365,7 +365,7 @@ export default function AddServiceReminderDialog({ vehicleId, reminder, children
 
                   {isCompleted && (
                     <div className="space-y-4 p-4 border rounded-md bg-muted/20">
-                      <div className="flex flex-col sm:grid sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="completedOdometer"

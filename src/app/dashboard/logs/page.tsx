@@ -3,7 +3,6 @@
 
 import type { ProcessedFuelLog } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils';
 import AddFuelLogDialog from '@/components/dashboard/add-fuel-log-dialog';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -13,7 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Edit, Trash2, Gauge, Droplets, Tag, Building, User as UserIcon, Plus, Fuel } from 'lucide-react';
 import DeleteFuelLogDialog from '@/components/dashboard/delete-fuel-log-dialog';
 import { usePreferences } from '@/context/preferences-context';
-import { Separator } from '@/components/ui/separator';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Card } from '@/components/ui/card';
 
 function processFuelLogs(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
   // Sort logs by date ascending to calculate consumption correctly
@@ -89,58 +89,79 @@ export default function LogsPage() {
                 <p className="mt-4 text-muted-foreground">Cargando registros...</p>
             </div>
         ) : processedLogs.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {processedLogs.map(log => (
-                    <Card key={log.id} className="flex flex-col">
-                        <CardHeader>
-                            <CardTitle className="flex justify-between items-start">
-                                <span>{formatDate(log.date)}</span>
-                                {log.isFillUp && <Badge variant="secondary">Lleno</Badge>}
-                            </CardTitle>
-                            <CardDescription>${log.totalCost.toFixed(2)} por {log.liters.toFixed(2)}L</CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex-grow space-y-3 text-sm">
-                           <Separator />
-                            <div className="flex justify-between">
-                                <span className="flex items-center gap-2 text-muted-foreground"><Gauge className="h-4 w-4" /> Odómetro</span>
-                                <span>{log.odometer.toLocaleString()} km</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="flex items-center gap-2 text-muted-foreground"><Droplets className="h-4 w-4" /> {consumptionUnit}</span>
-                                <span>{getFormattedConsumption(log.consumption)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="flex items-center gap-2 text-muted-foreground"><Tag className="h-4 w-4" /> $/Litro</span>
-                                <span>${log.pricePerLiter.toFixed(2)}</span>
-                            </div>
-                            {log.gasStation && (
-                                <div className="flex justify-between">
-                                    <span className="flex items-center gap-2 text-muted-foreground"><Building className="h-4 w-4" /> Gasolinera</span>
-                                    <span className="truncate max-w-[150px] text-right">{log.gasStation}</span>
-                                </div>
-                            )}
-                            {log.username && (
-                                <div className="flex justify-between">
-                                    <span className="flex items-center gap-2 text-muted-foreground"><UserIcon className="h-4 w-4" /> Conductor</span>
-                                    <span>{log.username}</span>
-                                </div>
-                            )}
-                        </CardContent>
-                         <CardFooter className="flex gap-2 bg-muted/30 p-2 border-t">
-                            <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} fuelLog={log} vehicle={vehicle}>
-                                <Button variant="outline" size="sm" className="w-full">
-                                    <Edit className="h-4 w-4 mr-1" /> Editar
-                                </Button>
-                            </AddFuelLogDialog>
-                            <DeleteFuelLogDialog vehicleId={vehicle.id} fuelLogId={log.id}>
-                                <Button variant="outline" size="sm" className="w-full text-destructive hover:text-destructive">
-                                    <Trash2 className="h-4 w-4 mr-1" /> Eliminar
-                                </Button>
-                            </DeleteFuelLogDialog>
-                        </CardFooter>
-                    </Card>
-                ))}
-            </div>
+            <Card>
+              <Accordion type="single" collapsible className="w-full">
+                  {processedLogs.map(log => (
+                      <AccordionItem value={log.id} key={log.id}>
+                          <AccordionTrigger className="px-6 py-4 text-left hover:no-underline">
+                              <div className="flex-1 flex flex-col sm:flex-row sm:justify-between sm:items-center">
+                                  <div className="flex-1">
+                                      <p className="font-semibold">{formatDate(log.date)}</p>
+                                      <p className="text-sm text-muted-foreground sm:hidden mt-1">${log.totalCost.toFixed(2)} por {log.liters.toFixed(2)}L</p>
+                                  </div>
+                                  <div className="hidden sm:flex items-center gap-6 text-sm text-right">
+                                      <div className="flex-1">
+                                          <p>${log.totalCost.toFixed(2)}</p>
+                                          <p className="text-muted-foreground text-xs">{log.liters.toFixed(2)} L</p>
+                                      </div>
+                                      <div className="w-24">
+                                          <p>{getFormattedConsumption(log.consumption)}</p>
+                                          <p className="text-muted-foreground text-xs">{consumptionUnit}</p>
+                                      </div>
+                                      <div className="w-24">
+                                          <p>{log.odometer.toLocaleString()} km</p>
+                                          <p className="text-muted-foreground text-xs">Odómetro</p>
+                                      </div>
+                                  </div>
+                              </div>
+                              {log.isFillUp && <Badge variant="secondary" className="ml-4 hidden sm:block">Lleno</Badge>}
+                          </AccordionTrigger>
+                          <AccordionContent className="px-6 pb-4">
+                              <div className="space-y-3 pt-4 border-t">
+                                  <div className="sm:hidden grid grid-cols-2 gap-4 text-sm">
+                                       <div>
+                                          <p className="font-medium">{getFormattedConsumption(log.consumption)}</p>
+                                          <p className="text-xs text-muted-foreground">{consumptionUnit}</p>
+                                       </div>
+                                       <div>
+                                          <p className="font-medium">{log.odometer.toLocaleString()} km</p>
+                                          <p className="text-xs text-muted-foreground">Odómetro</p>
+                                       </div>
+                                  </div>
+                                  <div className="flex justify-between text-sm items-center">
+                                      <span className="flex items-center gap-2 text-muted-foreground"><Tag className="h-4 w-4" /> Precio/Litro</span>
+                                      <span>${log.pricePerLiter.toFixed(2)}</span>
+                                  </div>
+                                  {log.gasStation && (
+                                      <div className="flex justify-between text-sm items-center">
+                                          <span className="flex items-center gap-2 text-muted-foreground"><Building className="h-4 w-4" /> Gasolinera</span>
+                                          <span className="truncate max-w-[150px] text-right">{log.gasStation}</span>
+                                      </div>
+                                  )}
+                                  {log.username && (
+                                      <div className="flex justify-between text-sm items-center">
+                                          <span className="flex items-center gap-2 text-muted-foreground"><UserIcon className="h-4 w-4" /> Conductor</span>
+                                          <span>{log.username}</span>
+                                      </div>
+                                  )}
+                                  <div className="flex gap-2 pt-4">
+                                      <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} fuelLog={log} vehicle={vehicle}>
+                                          <Button variant="outline" size="sm" className="w-full">
+                                              <Edit className="h-4 w-4 mr-1" /> Editar
+                                          </Button>
+                                      </AddFuelLogDialog>
+                                      <DeleteFuelLogDialog vehicleId={vehicle.id} fuelLogId={log.id}>
+                                          <Button variant="outline" size="sm" className="w-full text-destructive hover:text-destructive">
+                                              <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+                                          </Button>
+                                      </DeleteFuelLogDialog>
+                                  </div>
+                              </div>
+                          </AccordionContent>
+                      </AccordionItem>
+                  ))}
+              </Accordion>
+            </Card>
         ) : (
              <div className="h-64 text-center flex flex-col items-center justify-center rounded-lg border-2 border-dashed">
                 <Fuel className="h-12 w-12 text-muted-foreground" />
