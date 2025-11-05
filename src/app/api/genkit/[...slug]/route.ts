@@ -1,7 +1,6 @@
-'use client';
 
 import createApp from '@genkit-ai/next';
-import {GenkitError} from '@genkit-ai/core';
+import { GenkitError } from '@genkit-ai/core';
 import {notFound} from 'next/navigation';
 
 import '@/ai/flows/estimate-fuel-stop';
