@@ -46,6 +46,20 @@ export type ServiceReminder = {
   date: string; // Unified date for timeline
 };
 
+export type Trip = {
+    id: string;
+    vehicleId: string;
+    userId: string;
+    tripType: string;
+    destination: string;
+    notes?: string;
+    startDate: string;
+    startOdometer: number;
+    endDate?: string;
+    endOdometer?: number;
+    status: 'active' | 'completed';
+};
+
 export type ProcessedFuelLog = FuelLog & {
   distanceTraveled?: number;
   consumption?: number; // km/L

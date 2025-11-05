@@ -37,7 +37,7 @@ interface SettingsListProps {
   title: string;
   description: string;
   items: ConfigItem[];
-  collectionName: 'fuel_types' | 'service_types' | 'gas_stations';
+  collectionName: 'fuel_types' | 'service_types' | 'gas_stations' | 'trip_types';
   itemName: string;
   isLoading: boolean;
 }
@@ -89,7 +89,9 @@ export default function SettingsList({ title, description, items, collectionName
     } else {
       // Create
       const collectionRef = collection(firestore, collectionName);
-      addDocumentNonBlocking(collectionRef, { name: values.name });
+      const newDocRef = doc(collectionRef);
+      setDocumentNonBlocking(newDocRef, {id: newDocRef.id, name: values.name});
+
        toast({
         title: `${itemName} añadido`,
         description: 'El nuevo elemento ha sido guardado.'
