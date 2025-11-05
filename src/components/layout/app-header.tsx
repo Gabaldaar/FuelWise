@@ -1,17 +1,29 @@
+
 'use client';
 
+import { useMemo } from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import VehicleSelector from '../dashboard/vehicle-selector';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '../ui/button';
 import { LogOut } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { doc } from 'firebase/firestore';
+import type { User } from '@/lib/types';
 
 export default function AppHeader() {
   const auth = useAuth();
-  const { user } = useUser();
+  const { user: authUser } = useUser();
+  const firestore = useFirestore();
   const router = useRouter();
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!authUser) return null;
+    return doc(firestore, 'users', authUser.uid);
+  }, [firestore, authUser]);
+
+  const { data: userProfile } = useDoc<User>(userProfileRef);
 
   const handleSignOut = () => {
     signOut(auth);
@@ -25,9 +37,9 @@ export default function AppHeader() {
         <VehicleSelector />
       </div>
       <div className="flex items-center gap-4">
-        {user && (
+        {authUser && (
           <>
-            <span className='text-sm text-muted-foreground hidden sm:inline'>{user.email}</span>
+            <span className='text-sm text-muted-foreground hidden sm:inline'>{userProfile?.username || authUser.email}</span>
             <Button variant="ghost" size="icon" onClick={handleSignOut} title="Cerrar sesión">
               <LogOut className="h-4 w-4" />
             </Button>
