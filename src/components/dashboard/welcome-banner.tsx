@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -60,7 +59,23 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
   return (
     <Card className="overflow-hidden">
         <div className="flex flex-col">
-            <CardContent className="p-6">
+            {vehicle.imageUrl && (
+            <div className="relative w-full h-48 sm:h-64 bg-black/5">
+                <Image
+                    src={vehicle.imageUrl}
+                    alt={`${vehicle.make} ${vehicle.model}`}
+                    fill
+                    className="object-cover"
+                    data-ai-hint={vehicle.imageHint}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                <div className="absolute bottom-0 left-0 p-6">
+                    <h2 className="font-headline text-3xl text-white shadow-lg">{vehicle.make} {vehicle.model}</h2>
+                    <p className="text-white/90 text-base">{vehicle.year} - {vehicle.plate}</p>
+                </div>
+            </div>
+            )}
+             <CardContent className="p-6">
                 <div className="flex flex-wrap items-center gap-4">
                     {vehicle && <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} vehicle={vehicle} />}
                     {vehicle && (
@@ -81,23 +96,6 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
                     )}
                 </div>
             </CardContent>
-            
-            {vehicle.imageUrl && (
-            <div className="relative w-full h-48 sm:h-64 bg-black/5">
-                <Image
-                    src={vehicle.imageUrl}
-                    alt={`${vehicle.make} ${vehicle.model}`}
-                    fill
-                    className="object-cover"
-                    data-ai-hint={vehicle.imageHint}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                <div className="absolute bottom-0 left-0 p-6">
-                    <h2 className="font-headline text-3xl text-white shadow-lg">{vehicle.make} {vehicle.model}</h2>
-                    <p className="text-white/90 text-base">{vehicle.year} - {vehicle.plate}</p>
-                </div>
-            </div>
-            )}
         </div>
     </Card>
   );
