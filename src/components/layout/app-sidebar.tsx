@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Car, Fuel, Menu, LogOut, Settings, Wrench, History, Route, Leaf } from 'lucide-react';
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useAuth, useUser } from '@/firebase/auth/use-user';
+import { useFirestore, useDoc, useMemoFirebase } from '@/firebase/provider';
 import { signOut } from 'firebase/auth';
 import type { User } from '@/lib/types';
 import { doc } from 'firebase/firestore';
@@ -38,13 +39,14 @@ function UserInfo() {
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => {
-    if (!authUser) return null;
+    if (!authUser || !firestore) return null;
     return doc(firestore, 'users', authUser.uid);
   }, [firestore, authUser]);
 
   const { data: userProfile } = useDoc<User>(userProfileRef);
   
   const handleSignOut = () => {
+    if (!auth) return;
     signOut(auth);
     router.push('/login');
   };

@@ -2,7 +2,9 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import type { Vehicle } from '@/lib/types';
-import { useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore, useMemoFirebase } from '@/firebase/provider';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
@@ -20,7 +22,7 @@ export const VehicleProvider = ({ children }: { children: ReactNode }) => {
   const firestore = useFirestore();
 
   const vehiclesQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || !firestore) return null;
     return query(collection(firestore, 'vehicles'), orderBy('make'));
   }, [firestore, user]);
 

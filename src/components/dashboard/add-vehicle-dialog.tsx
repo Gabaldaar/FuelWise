@@ -27,7 +27,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { Vehicle, ConfigItem } from '@/lib/types';
-import { useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore, useMemoFirebase } from '@/firebase/provider';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { doc, collection, query, orderBy } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -61,7 +63,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
   const isEditing = !!vehicle;
 
   const fuelTypesQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || !firestore) return null;
     return query(collection(firestore, 'fuel_types'), orderBy('name'));
   }, [firestore, user]);
 
@@ -82,7 +84,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
   });
 
   async function onSubmit(values: FormValues) {
-    if (!user) {
+    if (!user || !firestore) {
         toast({
             variant: "destructive",
             title: "Error de autenticación",

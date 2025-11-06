@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore } from '@/firebase/provider';
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, doc } from 'firebase/firestore';
 import type { ConfigItem } from '@/lib/types';
@@ -66,7 +67,7 @@ export default function SettingsList({ title, description, items, collectionName
   };
 
   const handleDelete = (itemId: string) => {
-    if (!user) return;
+    if (!user || !firestore) return;
     const itemRef = doc(firestore, collectionName, itemId);
     deleteDocumentNonBlocking(itemRef);
     toast({
@@ -76,7 +77,7 @@ export default function SettingsList({ title, description, items, collectionName
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    if (!user) return;
+    if (!user || !firestore) return;
 
     if (editingItem) {
       // Update

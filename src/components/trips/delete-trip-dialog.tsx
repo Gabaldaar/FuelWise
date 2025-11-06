@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore } from '@/firebase/provider';
 import { doc } from 'firebase/firestore';
 import { deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
@@ -37,7 +38,7 @@ export default function DeleteTripDialog({
   const firestore = useFirestore();
 
   const handleDelete = async () => {
-    if (!user) {
+    if (!user || !firestore) {
       toast({
         variant: 'destructive',
         title: 'Error de autenticación',

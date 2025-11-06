@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -15,7 +14,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore } from '@/firebase/provider';
 import { doc } from 'firebase/firestore';
 import { deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
@@ -37,7 +37,7 @@ export default function DeleteFuelLogDialog({
   const firestore = useFirestore();
 
   const handleDelete = async () => {
-    if (!user) {
+    if (!user || !firestore) {
         toast({
             variant: "destructive",
             title: "Error de autenticación",

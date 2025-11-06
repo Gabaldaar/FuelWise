@@ -31,7 +31,10 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { toDateTimeLocalString } from '@/lib/utils';
 import type { Trip, ConfigItem, User } from '@/lib/types';
-import { useUser, useFirestore, useMemoFirebase, useCollection, useDoc } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore, useMemoFirebase } from '@/firebase/provider';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { useDoc } from '@/firebase/firestore/use-doc';
 import { doc, collection, query, orderBy } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -85,13 +88,13 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
   const isEditing = !!trip;
 
   const userProfileRef = useMemoFirebase(() => {
-    if (!authUser) return null;
+    if (!authUser || !firestore) return null;
     return doc(firestore, 'users', authUser.uid);
   }, [firestore, authUser]);
   const { data: userProfile } = useDoc<User>(userProfileRef);
   
   const tripTypesQuery = useMemoFirebase(() => {
-    if (!authUser) return null;
+    if (!authUser || !firestore) return null;
     return query(collection(firestore, 'trip_types'), orderBy('name'));
   }, [firestore, authUser]);
   const { data: tripTypes, isLoading: isLoadingTripTypes } = useCollection<ConfigItem>(tripTypesQuery);
@@ -135,7 +138,7 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
 
 
   async function onSubmit(values: FormValues) {
-    if (!authUser || !userProfile) {
+    if (!authUser || !userProfile || !firestore) {
         toast({ variant: "destructive", title: "Error", description: "Debes iniciar sesión." });
         return;
     }

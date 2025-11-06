@@ -8,7 +8,9 @@ import FuelConsumptionChart from '@/components/dashboard/fuel-consumption-chart'
 import ServiceReminders from '@/components/dashboard/service-reminders';
 import RecentFuelLogs from '@/components/dashboard/recent-fuel-logs';
 import { useVehicles } from '@/context/vehicle-context';
-import { useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore, useMemoFirebase } from '@/firebase/provider';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
@@ -57,7 +59,7 @@ export default function DashboardPage() {
   const { consumptionUnit, getFormattedConsumption, urgencyThresholdDays, urgencyThresholdKm } = usePreferences();
 
   const fuelLogsQuery = useMemoFirebase(() => {
-    if (!user || !vehicle) return null;
+    if (!user || !vehicle || !firestore) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'fuel_records'),
       orderBy('date', 'desc')
@@ -65,7 +67,7 @@ export default function DashboardPage() {
   }, [firestore, user, vehicle]);
 
   const remindersQuery = useMemoFirebase(() => {
-    if (!user || !vehicle) return null;
+    if (!user || !vehicle || !firestore) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'service_reminders'),
       orderBy('dueDate', 'asc')
@@ -73,7 +75,7 @@ export default function DashboardPage() {
   }, [firestore, user, vehicle]);
 
   const lastFuelLogQuery = useMemoFirebase(() => {
-    if (!user || !vehicle) return null;
+    if (!user || !vehicle || !firestore) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'fuel_records'),
       orderBy('odometer', 'desc'),

@@ -3,7 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { ProcessedFuelLog, ServiceReminder, TimelineItem, ProcessedServiceReminder, Vehicle, Trip } from '@/lib/types';
 import { useVehicles } from '@/context/vehicle-context';
-import { useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore, useMemoFirebase } from '@/firebase/provider';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -91,7 +93,7 @@ export default function HistoryPage() {
   const [isLoadingEstimate, setIsLoadingEstimate] = useState(false);
 
   const fuelLogsQuery = useMemoFirebase(() => {
-    if (!user || !vehicle) return null;
+    if (!user || !vehicle || !firestore) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'fuel_records'),
       orderBy('odometer', 'desc')
@@ -99,14 +101,14 @@ export default function HistoryPage() {
   }, [firestore, user, vehicle]);
 
   const remindersQuery = useMemoFirebase(() => {
-    if (!user || !vehicle) return null;
+    if (!user || !vehicle || !firestore) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'service_reminders')
     );
   }, [firestore, user, vehicle]);
   
   const tripsQuery = useMemoFirebase(() => {
-    if (!user || !vehicle) return null;
+    if (!user || !vehicle || !firestore) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'trips'),
       orderBy('endDate', 'desc')
@@ -114,7 +116,7 @@ export default function HistoryPage() {
   }, [firestore, user, vehicle]);
   
   const lastFuelLogQuery = useMemoFirebase(() => {
-    if (!user || !vehicle) return null;
+    if (!user || !vehicle || !firestore) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'fuel_records'),
       orderBy('odometer', 'desc'),

@@ -8,7 +8,9 @@ import { Plus, Wrench, Calendar, Gauge, Edit, AlertTriangle, CheckCircle2, Repea
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
 import AddServiceReminderDialog from '@/components/dashboard/add-service-reminder-dialog';
-import { useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore, useMemoFirebase } from '@/firebase/provider';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import DeleteServiceReminderDialog from '@/components/dashboard/delete-service-reminder-dialog';
 import { cn } from '@/lib/utils';
@@ -23,7 +25,7 @@ export default function ServicesPage() {
 
 
   const remindersQuery = useMemoFirebase(() => {
-    if (!user || !vehicle) return null;
+    if (!user || !vehicle || !firestore) return null;
     return query(
         collection(firestore, 'vehicles', vehicle.id, 'service_reminders'),
         orderBy('dueDate', 'desc')
@@ -31,7 +33,7 @@ export default function ServicesPage() {
   }, [firestore, user, vehicle]);
 
   const lastFuelLogQuery = useMemoFirebase(() => {
-    if (!user || !vehicle) return null;
+    if (!user || !vehicle || !firestore) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'fuel_records'),
       orderBy('odometer', 'desc'),

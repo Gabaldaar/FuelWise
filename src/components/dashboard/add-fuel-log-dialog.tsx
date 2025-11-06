@@ -40,7 +40,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { cn, formatDate } from '@/lib/utils';
-import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore, useMemoFirebase } from '@/firebase/provider';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, doc, query, orderBy } from 'firebase/firestore';
 import { addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { FuelLog, User, Vehicle, ConfigItem } from '@/lib/types';
@@ -84,19 +87,19 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
   const isEditing = !!fuelLog;
 
   const userProfileRef = useMemoFirebase(() => {
-    if (!authUser) return null;
+    if (!authUser || !firestore) return null;
     return doc(firestore, 'users', authUser.uid);
   }, [firestore, authUser]);
 
   const { data: userProfile } = useDoc<User>(userProfileRef);
 
   const fuelTypesQuery = useMemoFirebase(() => {
-    if (!authUser) return null;
+    if (!authUser || !firestore) return null;
     return query(collection(firestore, 'fuel_types'), orderBy('name'));
   }, [firestore, authUser]);
   
   const gasStationsQuery = useMemoFirebase(() => {
-    if (!authUser) return null;
+    if (!authUser || !firestore) return null;
     return query(collection(firestore, 'gas_stations'), orderBy('name'));
   }, [firestore, authUser]);
 
@@ -160,7 +163,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
 
 
   async function onSubmit(values: FormValues) {
-    if (!authUser || !userProfile) {
+    if (!authUser || !userProfile || !firestore) {
         toast({
             variant: "destructive",
             title: "Error",

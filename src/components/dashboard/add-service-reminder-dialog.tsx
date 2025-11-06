@@ -34,7 +34,9 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { ServiceReminder, ConfigItem } from '@/lib/types';
-import { useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore, useMemoFirebase } from '@/firebase/provider';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { doc, collection, query, orderBy } from 'firebase/firestore';
 import { setDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -94,7 +96,7 @@ export default function AddServiceReminderDialog({ vehicleId, reminder, children
   const isEditing = !!reminder;
 
   const serviceTypesQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || !firestore) return null;
     return query(collection(firestore, 'service_types'), orderBy('name'));
   }, [firestore, user]);
 
@@ -136,7 +138,7 @@ export default function AddServiceReminderDialog({ vehicleId, reminder, children
 
 
   async function onSubmit(values: FormValues) {
-    if (!user) {
+    if (!user || !firestore) {
         toast({
             variant: "destructive",
             title: "Error",
@@ -175,7 +177,7 @@ export default function AddServiceReminderDialog({ vehicleId, reminder, children
     };
 
     if (isEditing && values.isCompleted && values.isRecurring && values.recurrenceIntervalKm && values.completedOdometer) {
-        const originalReminderRef = doc(firestore, 'vehicles', vehicleId, 'service_reminders', reminder.id);
+        const originalReminderRef = doc(firestore, 'vehicles', vehicleId, reminder.id);
         const completedData = {
           ...reminder,
           ...reminderData,

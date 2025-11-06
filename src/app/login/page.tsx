@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Leaf, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useAuth } from '@/firebase';
+import { useAuth } from '@/firebase/provider';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -41,6 +41,14 @@ export default function LoginPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!auth) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'El servicio de autenticación no está disponible.',
+        });
+        return;
+    }
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
@@ -105,7 +113,7 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={isLoading || !auth}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Ingresar
               </Button>

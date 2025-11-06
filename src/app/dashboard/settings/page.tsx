@@ -15,7 +15,9 @@ import {
 } from '@/components/ui/tabs';
 import SettingsList from '@/components/settings/settings-list';
 import type { ConfigItem } from '@/lib/types';
-import { useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
+import { useFirestore, useMemoFirebase } from '@/firebase/provider';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { Droplets, Wrench, Building, SlidersHorizontal, Route } from 'lucide-react';
 import PreferencesSettings from '@/components/settings/preferences-settings';
@@ -26,22 +28,22 @@ export default function SettingsPage() {
 
   // Queries now point to top-level collections
   const fuelTypesQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || !firestore) return null;
     return query(collection(firestore, 'fuel_types'), orderBy('name'));
   }, [firestore, user]);
 
   const serviceTypesQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || !firestore) return null;
     return query(collection(firestore, 'service_types'), orderBy('name'));
   }, [firestore, user]);
 
   const gasStationsQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || !firestore) return null;
     return query(collection(firestore, 'gas_stations'), orderBy('name'));
   }, [firestore, user]);
   
   const tripTypesQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || !firestore) return null;
     return query(collection(firestore, 'trip_types'), orderBy('name'));
   }, [firestore, user]);
 
