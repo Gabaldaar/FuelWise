@@ -255,10 +255,10 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
 
                   <div className="grid grid-cols-2 gap-4">
                       <FormField control={form.control} name="startOdometer" render={({ field }) => (
-                          <FormItem><FormLabel>Odómetro Inicial</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} disabled={isEditing} /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel>Odómetro Inicial</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                       )} />
                       <FormField control={form.control} name="startDate" render={({ field }) => (
-                          <FormItem><FormLabel>Fecha de Inicio</FormLabel><FormControl><Input type="datetime-local" {...field} disabled={isEditing} /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel>Fecha de Inicio</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem>
                       )} />
                   </div>
                   
