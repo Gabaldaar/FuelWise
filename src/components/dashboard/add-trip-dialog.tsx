@@ -193,7 +193,7 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-headline">{isEditing ? (trip.status === 'active' ? 'Finalizar' : 'Editar') : 'Iniciar Nuevo'} Viaje</DialogTitle>
+          <DialogTitle className="font-headline">{isEditing ? (trip.status === 'active' ? 'Editar Viaje Activo' : 'Editar Viaje') : 'Iniciar Nuevo'} Viaje</DialogTitle>
           <DialogDescription>
             {isEditing ? 'Completa o edita los detalles de tu viaje.' : 'Registra un nuevo viaje para tu vehículo.'}
           </DialogDescription>
@@ -203,7 +203,7 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
              <div className="max-h-[65vh] overflow-y-auto pr-4 pl-1 -mr-4 -ml-1">
                 <div className="space-y-4">
                   
-                  {isEditing && (
+                  {isEditing && trip.status !== 'completed' && (
                     <FormField
                       control={form.control}
                       name="status"
@@ -225,13 +225,13 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
                   )}
 
                   <Separator />
-                  <p className="text-sm font-medium">{status === 'active' ? "Detalles de Inicio" : "Detalles del Viaje"}</p>
+                  <p className="text-sm font-medium">Detalles del Viaje</p>
                   
                   <div className="grid grid-cols-2 gap-4">
                       <FormField control={form.control} name="tripType" render={({ field }) => (
                           <FormItem>
                           <FormLabel>Tipo de Viaje</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={status === 'completed'}>
+                              <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                                   <FormControl><SelectTrigger disabled={isLoadingTripTypes}><SelectValue placeholder="Selecciona..." /></SelectTrigger></FormControl>
                                   <SelectContent>
                                     {tripTypes?.map(type => <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>)}
@@ -243,24 +243,62 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
                        <FormField control={form.control} name="destination" render={({ field }) => (
                           <FormItem>
                           <FormLabel>Destino</FormLabel>
-                          <FormControl><Input placeholder="e.g., Oficina" {...field} disabled={status === 'completed'} /></FormControl>
+                          <FormControl><Input placeholder="e.g., Oficina" {...field} /></FormControl>
                           <FormMessage />
                           </FormItem>
                       )} />
                   </div>
 
                   <FormField control={form.control} name="notes" render={({ field }) => (
-                    <FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea placeholder="Notas adicionales..." {...field} disabled={status === 'completed'} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea placeholder="Notas adicionales..." {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
 
                   <div className="grid grid-cols-2 gap-4">
                       <FormField control={form.control} name="startOdometer" render={({ field }) => (
-                          <FormItem><FormLabel>Odómetro Inicial</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} disabled={status === 'completed'} /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel>Odómetro Inicial</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} disabled={isEditing} /></FormControl><FormMessage /></FormItem>
                       )} />
                       <FormField control={form.control} name="startDate" render={({ field }) => (
-                          <FormItem><FormLabel>Fecha de Inicio</FormLabel><FormControl><Input type="datetime-local" {...field} disabled={status === 'completed'} /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel>Fecha de Inicio</FormLabel><FormControl><Input type="datetime-local" {...field} disabled={isEditing} /></FormControl><FormMessage /></FormItem>
                       )} />
                   </div>
+                  
+                  <div className="space-y-4 pt-4 border-t">
+                      <Label>Gastos del Viaje</Label>
+                      <div className="space-y-2">
+                        {fields.map((field, index) => (
+                          <div key={field.id} className="flex items-center gap-2">
+                            <FormField
+                              control={control}
+                              name={`expenses.${index}.description`}
+                              render={({ field }) => (
+                                <Input {...field} placeholder="Descripción (ej: Peaje)" className="flex-1" />
+                              )}
+                            />
+                            <FormField
+                              control={control}
+                              name={`expenses.${index}.amount`}
+                              render={({ field }) => (
+                                  <Input {...field} type="number" step="0.01" placeholder="$" className="w-24" />
+                              )}
+                            />
+                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => append({ description: "", amount: 0 })}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Añadir Gasto
+                      </Button>
+                  </div>
+
 
                   {status === 'completed' && (
                     <div className="space-y-4 pt-4 border-t">
@@ -270,44 +308,8 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
                               <FormItem><FormLabel>Odómetro Final</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                           )} />
                           <FormField control={form.control} name="endDate" render={({ field }) => (
-                             <FormItem><FormLabel>Fecha de Fin</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem>
+                             <FormItem><FormLabel>Fecha de Fin</FormLabel><FormControl><Input type="datetime-local" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                           )} />
-                      </div>
-                       <div>
-                          <Label>Gastos del Viaje</Label>
-                          <div className="space-y-2 mt-2">
-                            {fields.map((field, index) => (
-                              <div key={field.id} className="flex items-center gap-2">
-                                <FormField
-                                  control={control}
-                                  name={`expenses.${index}.description`}
-                                  render={({ field }) => (
-                                    <Input {...field} placeholder="Descripción (ej: Peaje)" className="flex-1" />
-                                  )}
-                                />
-                                <FormField
-                                  control={control}
-                                  name={`expenses.${index}.amount`}
-                                  render={({ field }) => (
-                                     <Input {...field} type="number" step="0.01" placeholder="$" className="w-24" />
-                                  )}
-                                />
-                                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="mt-2"
-                            onClick={() => append({ description: "", amount: 0 })}
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Añadir Gasto
-                          </Button>
                       </div>
                     </div>
                   )}

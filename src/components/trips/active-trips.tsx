@@ -62,15 +62,9 @@ export default function ActiveTrips({ trips, vehicleId, lastOdometer }: ActiveTr
                 </div>
                 <div className="flex gap-2 self-start sm:self-center shrink-0">
                   <AddTripDialog vehicleId={vehicleId} trip={trip} lastOdometer={lastOdometer}>
-                    <Button variant="outline">
-                      <Edit className="mr-2 h-4 w-4" />
-                      Editar
-                    </Button>
-                  </AddTripDialog>
-                  <AddTripDialog vehicleId={vehicleId} trip={trip} lastOdometer={lastOdometer}>
-                    <Button variant="destructive">
+                    <Button>
                       <Flag className="mr-2 h-4 w-4" />
-                      Finalizar
+                      Finalizar/Editar
                     </Button>
                   </AddTripDialog>
                    <DeleteTripDialog vehicleId={vehicleId} tripId={trip.id} />
