@@ -22,6 +22,7 @@ const EstimateFuelStopInputSchema = z.object({
   currentFuelLevelPercent: z
     .number()
     .describe('The current fuel level of the vehicle as a percentage (0-100).'),
+  currentOdometer: z.number().describe('The current odometer reading of the vehicle.'),
 });
 export type EstimateFuelStopInput = z.infer<typeof EstimateFuelStopInputSchema>;
 
@@ -32,6 +33,9 @@ const EstimateFuelStopOutputSchema = z.object({
   estimatedRefuelDate: z
     .string()
     .describe('The estimated date when the next refueling stop will be needed (ISO format).'),
+  estimatedOdometerAtEmpty: z
+    .number()
+    .describe('The estimated odometer reading when the fuel tank will be empty.'),
 });
 export type EstimateFuelStopOutput = z.infer<typeof EstimateFuelStopOutputSchema>;
 
@@ -49,6 +53,7 @@ const estimateFuelStopFlow = ai.defineFlow(
     // Calculate estimated distance to empty (km)
     const remainingFuelLiters = (input.currentFuelLevelPercent / 100) * input.fuelCapacityLiters;
     const estimatedDistanceToEmptyKm = remainingFuelLiters * input.averageConsumptionKmPerLiter;
+    const estimatedOdometerAtEmpty = input.currentOdometer + estimatedDistanceToEmptyKm;
 
     // Calculate estimated refuel date
     const now = new Date();
@@ -63,6 +68,7 @@ const estimateFuelStopFlow = ai.defineFlow(
     return {
       estimatedDistanceToEmptyKm,
       estimatedRefuelDate,
+      estimatedOdometerAtEmpty,
     };
   }
 );

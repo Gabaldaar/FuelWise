@@ -27,7 +27,7 @@ export default function RecentFuelLogs({ data }: RecentFuelLogsProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-headline">Repostajes Recientes</CardTitle>
+        <CardTitle className="font-headline">Recargas Recientes</CardTitle>
         <CardDescription>Últimos 5 registros de combustible.</CardDescription>
       </CardHeader>
       <CardContent>

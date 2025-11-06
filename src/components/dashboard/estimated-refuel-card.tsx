@@ -23,7 +23,7 @@ export default function EstimatedRefuelCard({ estimate, isLoading }: EstimatedRe
 
           <div className="flex-1 min-w-0">
             <p className="font-semibold">
-              {isLoading ? 'Estimando próximo repostaje...' : 'Próximo Repostaje (Estimado)'}
+              {isLoading ? 'Estimando próxima recarga...' : 'Próxima Recarga (Estimado)'}
             </p>
             {!isLoading && estimate && (
               <p className="text-sm text-muted-foreground truncate">
@@ -32,15 +32,18 @@ export default function EstimatedRefuelCard({ estimate, isLoading }: EstimatedRe
             )}
           </div>
           {!isLoading && estimate && (
-            <div className="text-right">
-              <p className="font-semibold flex items-center gap-2">
-                <Gauge className="h-4 w-4" />
-                {Math.round(estimate.estimatedDistanceToEmptyKm)} km
-              </p>
-              <p className="text-xs text-muted-foreground flex items-center justify-end gap-2">
-                <Calendar className="h-3 w-3" />
-                {formatDate(estimate.estimatedRefuelDate)}
-              </p>
+            <div className="text-right text-sm">
+                <p className="font-semibold flex items-center justify-end gap-2">
+                    {Math.round(estimate.estimatedOdometerAtEmpty).toLocaleString()} km
+                    <Gauge className="h-4 w-4" />
+                </p>
+                <p className="font-medium flex items-center justify-end gap-2">
+                    {Math.round(estimate.estimatedDistanceToEmptyKm)} km
+                </p>
+                <p className="text-xs text-muted-foreground flex items-center justify-end gap-2 mt-1">
+                    {formatDate(estimate.estimatedRefuelDate)}
+                    <Calendar className="h-3 w-3" />
+                </p>
             </div>
           )}
         </div>

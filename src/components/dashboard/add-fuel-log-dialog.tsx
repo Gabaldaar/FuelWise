@@ -207,7 +207,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
 
     toast({
       title: isEditing ? 'Registro Actualizado' : 'Registro Añadido',
-      description: 'El registro de combustible se ha guardado correctamente.',
+      description: 'La recarga de combustible se ha guardado correctamente.',
     });
     setIsSubmitting(false);
     setOpen(false);
@@ -219,15 +219,15 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
         {children ? children : (
             <Button>
                 <Plus className="-ml-1 mr-2 h-4 w-4" />
-                Añadir Repostaje
+                Añadir Recarga
             </Button>
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-headline">{isEditing ? 'Editar': 'Nuevo'} Registro de Combustible</DialogTitle>
+          <DialogTitle className="font-headline">{isEditing ? 'Editar': 'Nueva'} Recarga de Combustible</DialogTitle>
           <DialogDescription>
-            {isEditing ? 'Actualiza los detalles de tu repostaje.' : 'Añade los detalles de tu último repostaje.'}
+            {isEditing ? 'Actualiza los detalles de tu recarga.' : 'Añade los detalles de tu última recarga.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -407,7 +407,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                   <div className="space-y-0.5">
-                    <FormLabel>¿Omitiste un repostaje anterior?</FormLabel>
+                    <FormLabel>¿Omitiste una recarga anterior?</FormLabel>
                     <FormDescription>
                       Esto invalidará el cálculo de consumo para este registro.
                     </FormDescription>

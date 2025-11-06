@@ -139,7 +139,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     const getEstimate = async () => {
-      if (!vehicle || !avgConsumption) return;
+      if (!vehicle || !avgConsumption || !lastLogForEstimate) return;
 
       setIsLoadingEstimate(true);
       try {
@@ -152,6 +152,7 @@ export default function HistoryPage() {
           fuelCapacityLiters: vehicle.fuelCapacityLiters,
           averageConsumptionKmPerLiter: avgConsumption,
           currentFuelLevelPercent: currentFuelLevelPercent,
+          currentOdometer: lastLogForEstimate.odometer,
         });
         setEstimate(output);
       } catch (error) {
@@ -246,7 +247,7 @@ export default function HistoryPage() {
      <Card>
       <CardHeader>
         <CardTitle className="font-headline flex items-center gap-2"><History /> Historial del Vehículo</CardTitle>
-        <CardDescription>Una línea de tiempo unificada de todos los repostajes y servicios para tu {vehicle.make} {vehicle.model}.</CardDescription>
+        <CardDescription>Una línea de tiempo unificada de todas las recargas y servicios para tu {vehicle.make} {vehicle.model}.</CardDescription>
       </CardHeader>
       <CardContent>
          {isLoading ? (
@@ -271,7 +272,7 @@ export default function HistoryPage() {
                   <div className="h-64 text-center flex flex-col items-center justify-center rounded-lg border-2 border-dashed">
                       <History className="h-12 w-12 text-muted-foreground" />
                       <p className="mt-4 font-semibold">No hay historial.</p>
-                      <p className="text-sm text-muted-foreground">Añade repostajes o servicios para empezar a construir la línea de tiempo.</p>
+                      <p className="text-sm text-muted-foreground">Añade recargas o servicios para empezar a construir la línea de tiempo.</p>
                   </div>
               )}
             </div>
@@ -289,7 +290,7 @@ function FuelLogItemContent({ log, vehicle, lastLog }: { log: ProcessedFuelLog, 
         <div className="flex items-center gap-4 w-full">
             <Fuel className="h-8 w-8 flex-shrink-0 text-blue-500/80" />
             <div className="flex-1 min-w-0">
-                <p className="font-semibold">{formatDate(log.date)} - Repostaje</p>
+                <p className="font-semibold">{formatDate(log.date)} - Recarga</p>
                 <p className="text-sm text-muted-foreground truncate">${log.totalCost.toFixed(2)} por {log.liters.toFixed(2)}L en {log.gasStation}</p>
             </div>
             <div className="text-right">
@@ -545,5 +546,3 @@ function TripItemContent({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: 
     </>
   )
 }
-
-    

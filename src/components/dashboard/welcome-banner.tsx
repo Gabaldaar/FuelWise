@@ -24,7 +24,7 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
 
   useEffect(() => {
     const getEstimate = async () => {
-      if (!vehicle || !vehicle.averageConsumptionKmPerLiter) return;
+      if (!vehicle || !vehicle.averageConsumptionKmPerLiter || !lastLog) return;
 
       setIsLoading(true);
       try {
@@ -39,6 +39,7 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
           fuelCapacityLiters: vehicle.fuelCapacityLiters,
           averageConsumptionKmPerLiter: vehicle.averageConsumptionKmPerLiter,
           currentFuelLevelPercent: currentFuelLevelPercent,
+          currentOdometer: lastLog.odometer,
         });
         setEstimate(output);
       } catch (error) {
@@ -70,7 +71,7 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
                 </CardHeader>
                 <CardContent className="p-0 pt-6">
                     <p className="text-muted-foreground mb-4">
-                        Aquí tienes un resumen del rendimiento y los próximos mantenimientos de tu vehículo. Añade un nuevo repostaje para mantener tus datos al día.
+                        Aquí tienes un resumen del rendimiento y los próximos mantenimientos de tu vehículo. Añade una nueva recarga para mantener tus datos al día.
                     </p>
                     <div className="flex flex-wrap items-center gap-4">
                       {vehicle && <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} vehicle={vehicle} />}
@@ -79,7 +80,7 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
                         <div className="text-sm text-muted-foreground">
                             <span>Autonomía est: <b>{Math.round(estimate.estimatedDistanceToEmptyKm)} km</b></span>
                             <span className="mx-2">|</span>
-                            <span>Próximo repostaje: <b>{formatDate(estimate.estimatedRefuelDate)}</b></span>
+                            <span>Próxima recarga: <b>{formatDate(estimate.estimatedRefuelDate)}</b></span>
                         </div>
                       )}
                    </div>

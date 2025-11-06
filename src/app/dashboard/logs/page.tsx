@@ -73,12 +73,12 @@ export default function LogsPage() {
        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
               <h1 className="font-headline text-3xl">Registros de Combustible</h1>
-              <p className="text-muted-foreground">Un historial completo de todos tus repostajes.</p>
+              <p className="text-muted-foreground">Un historial completo de todas tus recargas.</p>
           </div>
           <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} vehicle={vehicle}>
             <Button>
               <Plus className="-ml-1 mr-2 h-4 w-4" />
-              Añadir Repostaje
+              Añadir Recarga
             </Button>
           </AddFuelLogDialog>
         </div>
@@ -169,7 +169,7 @@ export default function LogsPage() {
              <div className="h-64 text-center flex flex-col items-center justify-center rounded-lg border-2 border-dashed">
                 <Fuel className="h-12 w-12 text-muted-foreground" />
                 <p className="mt-4 font-semibold">No hay registros de combustible.</p>
-                <p className="text-sm text-muted-foreground">Añade tu primer repostaje para empezar a rastrear.</p>
+                <p className="text-sm text-muted-foreground">Añade tu primera recarga para empezar a rastrear.</p>
             </div>
         )}
     </div>
