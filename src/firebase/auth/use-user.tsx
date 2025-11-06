@@ -1,6 +1,6 @@
 'use client';
 
-import { useFirebase, type UserHookResult } from '@/firebase/provider';
+import { useFirebase, type UserHookResult } from '@/firebase';
 
 /**
  * Hook specifically for accessing the authenticated user's state.

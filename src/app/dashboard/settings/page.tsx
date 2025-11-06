@@ -15,9 +15,7 @@ import {
 } from '@/components/ui/tabs';
 import SettingsList from '@/components/settings/settings-list';
 import type { ConfigItem } from '@/lib/types';
-import { useUser } from '@/firebase/auth/use-user';
-import { useFirestore, useMemoFirebase } from '@/firebase/provider';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { Droplets, Wrench, Building, SlidersHorizontal, Route } from 'lucide-react';
 import PreferencesSettings from '@/components/settings/preferences-settings';
