@@ -31,17 +31,19 @@ export default function VehiclesPage() {
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {vehicles.map((vehicle: Vehicle) => (
                     <Card key={vehicle.id} className="flex flex-col">
-                        {vehicle.imageUrl && (
-                            <div className="relative h-48 w-full">
-                            <Image
-                                src={vehicle.imageUrl}
-                                alt={`${vehicle.make} ${vehicle.model}`}
-                                fill
-                                className="object-cover rounded-t-lg"
-                                data-ai-hint={vehicle.imageHint}
-                            />
-                            </div>
-                        )}
+                        <div className="relative h-48 w-full bg-muted/30 rounded-t-lg flex items-center justify-center">
+                          {vehicle.imageUrl ? (
+                              <Image
+                                  src={vehicle.imageUrl}
+                                  alt={`${vehicle.make} ${vehicle.model}`}
+                                  fill
+                                  className="object-cover"
+                                  data-ai-hint={vehicle.imageHint}
+                              />
+                          ) : (
+                              <Car className="h-16 w-16 text-muted-foreground" />
+                          )}
+                        </div>
                         <CardHeader>
                             <CardTitle className='font-headline text-2xl'>{vehicle.make} {vehicle.model}</CardTitle>
                             <CardDescription>{vehicle.year} - {vehicle.plate}</CardDescription>
