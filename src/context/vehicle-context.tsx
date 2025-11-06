@@ -2,8 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import type { Vehicle } from '@/lib/types';
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase/provider';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
