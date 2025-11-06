@@ -178,10 +178,12 @@ export default function HistoryPage() {
 
     (fuelLogs || []).forEach(log => {
       if (!from || !to || (new Date(log.date) >= from && new Date(log.date) <= to)) {
-        if (log.missedPreviousFillUp) {
-            combined.push({ type: 'missed-log', sortKey: log.odometer + 1, date: log.date, data: {} });
-        }
         combined.push({ type: 'fuel', sortKey: log.odometer, date: log.date, data: log });
+        if (log.missedPreviousFillUp) {
+            // The missing log is chronologically *before* this one, which means it should appear *after* it in a descending list.
+            // We subtract 1 from the odometer to ensure it's sorted just after the current log.
+            combined.push({ type: 'missed-log', sortKey: log.odometer - 1, date: log.date, data: {} });
+        }
       }
     });
 
@@ -215,11 +217,15 @@ export default function HistoryPage() {
         sortKey = reminder.dueOdometer;
         timelineDate = reminder.dueDate; 
       } else if (reminder.dueDate) {
+        // For date-only reminders, we need a numeric sort key. Using timestamp.
+        // To avoid conflicts with large odometer numbers, we can invert it or use a different scale,
+        // but for now, timestamp should be fine if odometers are not excessively large.
         sortKey = new Date(reminder.dueDate).getTime();
         timelineDate = reminder.dueDate;
       }
 
       if (sortKey === null && !timelineDate) {
+          // Fallback for reminders without any date or odo, shouldn't happen with validation
           sortKey = new Date().getTime();
           timelineDate = new Date().toISOString();
       }
@@ -276,9 +282,9 @@ export default function HistoryPage() {
               {timelineItems.length > 0 ? (
                   <Accordion type="single" collapsible className="w-full">
                     {timelineItems.map((item, index) => (
-                      <Fragment key={`${item.type}-${'id' in item.data ? item.data.id : index}-${index}`}>
-                        {item.type === 'missed-log' && <MissedLogPlaceholder />}
+                      <Fragment key={`${item.type}-${'id' in item.data ? item.data.id : index}-${item.sortKey}`}>
                         {item.type === 'fuel' && 'id' in item.data && <AccordionItem value={`fuel-${item.data.id}`}><FuelLogItemContent log={item.data as ProcessedFuelLog} vehicle={vehicle as Vehicle} lastLog={lastLogForNewEntry} /></AccordionItem>}
+                        {item.type === 'missed-log' && <MissedLogPlaceholder />}
                         {item.type === 'service' && 'id' in item.data && <AccordionItem value={`service-${item.data.id}`}><ServiceItemContent reminder={item.data as ProcessedServiceReminder} vehicleId={vehicle.id} lastOdometer={lastOdometer} /></AccordionItem>}
                         {item.type === 'trip' && 'id' in item.data && <AccordionItem value={`trip-${item.data.id}`}><TripItemContent trip={item.data as Trip} vehicle={vehicle as Vehicle} allFuelLogs={fuelLogs || []} /></AccordionItem>}
                       </Fragment>
@@ -616,3 +622,5 @@ function TripItemContent({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: 
     </>
   )
 }
+
+    

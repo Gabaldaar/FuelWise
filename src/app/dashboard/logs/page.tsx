@@ -129,7 +129,6 @@ export default function LogsPage() {
               <Accordion type="single" collapsible className="w-full">
                   {processedLogs.map(log => (
                       <Fragment key={log.id}>
-                        {log.missedPreviousFillUp && <MissedLogPlaceholder />}
                         <AccordionItem value={log.id}>
                             <AccordionTrigger className="px-6 py-4 text-left hover:no-underline">
                               <div className="flex items-center gap-4 w-full">
@@ -208,6 +207,7 @@ export default function LogsPage() {
                                 </div>
                             </AccordionContent>
                         </AccordionItem>
+                        {log.missedPreviousFillUp && <MissedLogPlaceholder />}
                       </Fragment>
                   ))}
               </Accordion>
@@ -222,3 +222,5 @@ export default function LogsPage() {
     </div>
   );
 }
+
+    
