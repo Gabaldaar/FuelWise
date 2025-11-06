@@ -104,13 +104,25 @@ export default function ReportsPage() {
     const kmPerDay = kmTraveled / periodDays;
 
     const avgAutonomy = avgConsumption > 0 ? avgConsumption * vehicle.fuelCapacityLiters : 0;
+    
+    const fillUpLogs = fuelLogs.filter(log => log.isFillUp);
+    let totalDistanceBetweenFillUps = 0;
+    let fillUpIntervals = 0;
+    for (let i = 1; i < fillUpLogs.length; i++) {
+        const distance = fillUpLogs[i].odometer - fillUpLogs[i-1].odometer;
+        if(distance > 0) {
+            totalDistanceBetweenFillUps += distance;
+            fillUpIntervals++;
+        }
+    }
+    const avgKmBetweenFillUps = fillUpIntervals > 0 ? totalDistanceBetweenFillUps / fillUpIntervals : 0;
 
     return {
       totalCost, totalFuelCost, totalServiceCost, kmTraveled,
       costPerKm, fuelCostPerKm, serviceCostPerKm,
       costPerDay, fuelCostPerDay, serviceCostPerDay,
       avgConsumption, minConsumption, maxConsumption,
-      kmPerDay, fuelLogs, avgAutonomy, empty: false,
+      kmPerDay, fuelLogs, avgAutonomy, avgKmBetweenFillUps, empty: false,
     };
   }, [dateRange, vehicle, allFuelLogsData, allServicesData]);
 
@@ -175,6 +187,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 <ReportStatCard title="Autonomía Promedio" value={`${reportData.avgAutonomy.toFixed(0)} km`} description="con tanque lleno" variant="small" />
+                <ReportStatCard title="Km Promedio / Recarga" value={`${reportData.avgKmBetweenFillUps.toFixed(0)} km`} description="entre tanques llenos" variant="small" />
                 <ReportStatCard title="Consumo Promedio" value={`${reportData.avgConsumption.toFixed(2)} km/L`} description={`${toLitersPer100Km(reportData.avgConsumption).toFixed(2)} L/100km`} variant="small" />
                 <ReportStatCard title="Consumo Mínimo (Mejor)" value={`${reportData.maxConsumption.toFixed(2)} km/L`} description={`${toLitersPer100Km(reportData.maxConsumption).toFixed(2)} L/100km`} variant="small" />
                 <ReportStatCard title="Consumo Máximo (Peor)" value={`${reportData.minConsumption.toFixed(2)} km/L`} description={`${toLitersPer100Km(reportData.minConsumption).toFixed(2)} L/100km`} variant="small" />
