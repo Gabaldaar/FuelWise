@@ -43,7 +43,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn, formatDate } from '@/lib/utils';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, orderBy } from 'firebase/firestore';
-import { addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { FuelLog, User, Vehicle, ConfigItem } from '@/lib/types';
 
 const formSchema = z.object({

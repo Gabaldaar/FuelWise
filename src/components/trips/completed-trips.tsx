@@ -1,9 +1,10 @@
+
 'use client';
 
-import type { Trip, ProcessedFuelLog, Vehicle } from '@/lib/types';
+import type { Trip, ProcessedFuelLog, Vehicle, TripExpense } from '@/lib/types';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Map, Edit, Trash2, Clock, Droplets, Wallet, Route, CircleDollarSign } from 'lucide-react';
+import { Map, Edit, Trash2, Clock, Droplets, Wallet, Route, CircleDollarSign, User } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
 import AddTripDialog from '../dashboard/add-trip-dialog';
 import { Button } from '../ui/button';
@@ -23,29 +24,23 @@ function TripDetails({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehi
     
     const tripCalculations = useMemo(() => {
         if (!trip.endOdometer || !trip.startOdometer) {
-            return { kmTraveled: 0, fuelConsumed: 0, totalCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A" };
+            return { kmTraveled: 0, fuelConsumed: 0, fuelCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A", otherExpenses: 0, totalCost: 0 };
         }
         const kmTraveled = trip.endOdometer - trip.startOdometer;
         if (kmTraveled <= 0) {
-            return { kmTraveled: 0, fuelConsumed: 0, totalCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A" };
+            return { kmTraveled: 0, fuelConsumed: 0, fuelCost: 0, avgConsumptionForTrip: 0, costPerKm: 0, duration: "N/A", otherExpenses: 0, totalCost: 0 };
         }
-
-        // --- Advanced Calculation Logic ---
         
-        // 1. Sort all logs by odometer ascending
+        const otherExpenses = (trip.expenses || []).reduce((acc, expense) => acc + expense.amount, 0);
+
         const sortedLogs = [...allFuelLogs].sort((a, b) => a.odometer - b.odometer);
-        
-        // 2. Find logs that happened *during* this trip
         const logsInTrip = sortedLogs.filter(log => log.odometer > trip.startOdometer! && log.odometer < trip.endOdometer!);
-
-        // 3. Create segments for calculation
         const keyOdometerPoints = [trip.startOdometer, ...logsInTrip.map(l => l.odometer), trip.endOdometer];
         
         let totalFuel = 0;
-        let totalCost = 0;
+        let fuelCost = 0;
 
-        // Use overall vehicle avg consumption and price as fallback
-        const fallbackConsumption = vehicle.averageConsumptionKmPerLiter > 0 ? vehicle.averageConsumptionKmPerLiter : 1; // Avoid division by zero
+        const fallbackConsumption = vehicle.averageConsumptionKmPerLiter > 0 ? vehicle.averageConsumptionKmPerLiter : 1;
         const historicAvgPrice = sortedLogs.length > 0 ? sortedLogs.reduce((acc, log) => acc + log.pricePerLiter, 0) / sortedLogs.length : 0;
         
         for (let i = 0; i < keyOdometerPoints.length - 1; i++) {
@@ -55,13 +50,9 @@ function TripDetails({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehi
 
             if (segmentDistance <= 0) continue;
 
-            // Find the log corresponding to the start of this segment.
-            // If segmentStartOdo is the trip's start, there's no log.
             const segmentStartLog = logsInTrip.find(l => l.odometer === segmentStartOdo);
             
-            // For segments starting with a fill-up, we can calculate real consumption
             if (segmentStartLog && segmentStartLog.isFillUp && !segmentStartLog.missedPreviousFillUp) {
-                // Find previous log in the full history to get consumption
                 const logIndex = sortedLogs.findIndex(l => l.id === segmentStartLog.id);
                 if (logIndex > 0) {
                     const prevLog = sortedLogs[logIndex - 1];
@@ -70,18 +61,18 @@ function TripDetails({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehi
                         const realConsumption = distanceSinceLastFill / segmentStartLog.liters;
                         if (realConsumption > 0) {
                             totalFuel += segmentDistance / realConsumption;
-                            totalCost += (segmentDistance / realConsumption) * segmentStartLog.pricePerLiter;
-                            continue; // Move to next segment
+                            fuelCost += (segmentDistance / realConsumption) * segmentStartLog.pricePerLiter;
+                            continue;
                         }
                     }
                 }
             }
             
-            // Fallback for first segment, last segment, or segments without precise data
             totalFuel += segmentDistance / fallbackConsumption;
-            totalCost += (segmentDistance / fallbackConsumption) * historicAvgPrice;
+            fuelCost += (segmentDistance / fallbackConsumption) * historicAvgPrice;
         }
 
+        const totalCost = fuelCost + otherExpenses;
         const finalAvgConsumption = kmTraveled > 0 && totalFuel > 0 ? kmTraveled / totalFuel : 0;
         const costPerKm = kmTraveled > 0 ? totalCost / kmTraveled : 0;
 
@@ -95,30 +86,39 @@ function TripDetails({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehi
         return {
             kmTraveled,
             fuelConsumed: totalFuel,
-            totalCost: totalCost,
+            fuelCost,
             avgConsumptionForTrip: finalAvgConsumption,
-            costPerKm: costPerKm,
-            duration: duration
+            costPerKm,
+            duration,
+            otherExpenses,
+            totalCost
         }
     }, [trip, allFuelLogs, vehicle.averageConsumptionKmPerLiter]);
 
-    const { kmTraveled, fuelConsumed, totalCost, avgConsumptionForTrip, costPerKm, duration } = tripCalculations;
+    const { kmTraveled, fuelConsumed, fuelCost, avgConsumptionForTrip, costPerKm, duration, otherExpenses, totalCost } = tripCalculations;
 
     return (
         <div className="space-y-3 pt-4 border-t pl-12">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                    <Droplets className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                        <p className="font-medium">{fuelConsumed.toFixed(2)} L</p>
-                        <p className="text-xs text-muted-foreground">Combustible (Est.)</p>
-                    </div>
-                </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-6 text-sm">
                  <div className="flex items-center gap-2">
                     <Wallet className="h-4 w-4 text-muted-foreground" />
                     <div>
                         <p className="font-medium">${totalCost.toFixed(2)}</p>
-                        <p className="text-xs text-muted-foreground">Costo Total (Est.)</p>
+                        <p className="text-xs text-muted-foreground">Costo Total Viaje</p>
+                    </div>
+                </div>
+                 <div className="flex items-center gap-2">
+                    <Droplets className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                        <p className="font-medium">{fuelConsumed.toFixed(2)} L (${fuelCost.toFixed(2)})</p>
+                        <p className="text-xs text-muted-foreground">Combustible (Est.)</p>
+                    </div>
+                </div>
+                 <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                        <p className="font-medium">{trip.username}</p>
+                        <p className="text-xs text-muted-foreground">Conductor</p>
                     </div>
                 </div>
                  <div className="flex items-center gap-2">
@@ -147,6 +147,19 @@ function TripDetails({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: Vehi
                 <div className="pt-2 text-sm">
                     <p className="font-medium">Notas:</p>
                     <p className="text-muted-foreground italic">{trip.notes}</p>
+                </div>
+            )}
+            {(trip.expenses && trip.expenses.length > 0) && (
+                 <div className="pt-2 text-sm">
+                    <p className="font-medium">Otros Gastos (${otherExpenses.toFixed(2)}):</p>
+                     <ul className="text-muted-foreground list-disc pl-5 mt-1">
+                        {trip.expenses.map((expense, index) => (
+                            <li key={index} className="flex justify-between">
+                                <span>{expense.description}</span>
+                                <span>${expense.amount.toFixed(2)}</span>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             )}
              <div className="flex gap-2 pt-4">

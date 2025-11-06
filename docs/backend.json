@@ -85,6 +85,10 @@
           "type": "string",
           "description": "ID of the user who created the record."
         },
+        "username": {
+          "type": "string",
+          "description": "Username of the user who created the record."
+        },
         "date": {
           "type": "string",
           "description": "Date of the fuel purchase.",
@@ -123,6 +127,7 @@
         "id",
         "vehicleId",
         "userId",
+        "username",
         "date",
         "odometerReading",
         "fuelType",
@@ -213,6 +218,10 @@
           "type": "string",
           "description": "ID of the user who started the trip."
         },
+        "username": {
+          "type": "string",
+          "description": "Username of the user who started the trip."
+        },
         "tripType": {
           "type": "string",
           "description": "The type of trip (e.g., Work, Vacation)."
@@ -250,12 +259,29 @@
             "completed"
           ],
           "description": "The current status of the trip."
+        },
+        "expenses": {
+          "type": "array",
+          "description": "A list of expenses associated with the trip.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "number"
+              }
+            },
+            "required": ["description", "amount"]
+          }
         }
       },
       "required": [
         "id",
         "vehicleId",
         "userId",
+        "username",
         "tripType",
         "destination",
         "startDate",
@@ -438,5 +464,3 @@
     "reasoning": "The Firestore structure is designed for collaboration. All data entities like vehicles, fuel records, and reminders are in top-level collections, accessible by any authenticated user. This removes the user-specific data nesting, allowing for a shared data model. User profiles are kept separate and private."
   }
 }
-
-    

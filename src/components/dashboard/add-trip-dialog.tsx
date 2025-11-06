@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -37,6 +38,11 @@ import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Separator } from '../ui/separator';
 
+const expenseSchema = z.object({
+  description: z.string().min(1, 'La descripción es obligatoria.'),
+  amount: z.coerce.number().min(0.01, 'El monto debe ser positivo.'),
+});
+
 const formSchema = z.object({
   tripType: z.string().min(1, 'El tipo de viaje es obligatorio.'),
   destination: z.string().min(1, 'El destino es obligatorio.'),
@@ -49,6 +55,7 @@ const formSchema = z.object({
   
   endDate: z.string().optional(),
   endOdometer: z.coerce.number().optional(),
+  expenses: z.array(expenseSchema).optional(),
 }).refine(data => {
   if (data.status === 'completed') {
     return !!data.endDate && !isNaN(Date.parse(data.endDate)) && !!data.endOdometer;
@@ -105,11 +112,17 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         startOdometer: lastOdometer || 0,
         status: 'active',
         endOdometer: lastOdometer || 0,
+        expenses: [],
     }
   });
   
-  const { watch, reset, setValue } = form;
+  const { control, watch, reset, setValue } = form;
   const status = watch('status');
+  
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "expenses",
+  });
 
   useEffect(() => {
     if (open) {
@@ -123,6 +136,7 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         status: trip?.status || 'active',
         endDate: trip?.endDate ? toDateTimeLocalString(new Date(trip.endDate)) : now,
         endOdometer: trip?.endOdometer || lastOdometer || 0,
+        expenses: trip?.expenses || [],
       });
     }
   }, [open, trip, reset, lastOdometer]);
@@ -144,15 +158,17 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
     const tripId = isEditing ? trip.id : doc(collection(firestore, '_')).id;
     const tripRef = doc(firestore, 'vehicles', vehicleId, 'trips', tripId);
     
-    const tripData: Partial<Trip> & { id: string, vehicleId: string, userId: string, startDate: string } = {
+    const tripData: Partial<Trip> & { id: string, vehicleId: string, userId: string, username: string, startDate: string } = {
         id: tripId,
         vehicleId,
         userId: authUser.uid,
+        username: userProfile.username,
         tripType: values.tripType,
         destination: values.destination,
         notes: values.notes,
         startOdometer: values.startOdometer,
         status: values.status,
+        expenses: values.expenses || [],
         startDate: new Date(values.startDate).toISOString(),
         ...(values.status === 'completed' && values.endDate && values.endOdometer && {
             endOdometer: values.endOdometer,
@@ -255,6 +271,42 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
                           <FormField control={form.control} name="endDate" render={({ field }) => (
                              <FormItem><FormLabel>Fecha de Fin</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
+                      </div>
+                       <div>
+                          <Label>Gastos del Viaje</Label>
+                          <div className="space-y-2 mt-2">
+                            {fields.map((field, index) => (
+                              <div key={field.id} className="flex items-center gap-2">
+                                <FormField
+                                  control={control}
+                                  name={`expenses.${index}.description`}
+                                  render={({ field }) => (
+                                    <Input {...field} placeholder="Descripción (ej: Peaje)" className="flex-1" />
+                                  )}
+                                />
+                                <FormField
+                                  control={control}
+                                  name={`expenses.${index}.amount`}
+                                  render={({ field }) => (
+                                     <Input {...field} type="number" step="0.01" placeholder="$" className="w-24" />
+                                  )}
+                                />
+                                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => append({ description: "", amount: 0 })}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Añadir Gasto
+                          </Button>
                       </div>
                     </div>
                   )}

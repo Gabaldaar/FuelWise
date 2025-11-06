@@ -17,6 +17,7 @@ export type FuelLog = {
   id: string;
   vehicleId: string;
   userId: string;
+  username: string;
   date: string; // ISO date string
   odometer: number;
   fuelType: string;
@@ -25,7 +26,6 @@ export type FuelLog = {
   liters: number;
   gasStation: string;
   isFillUp: boolean;
-  username: string;
   missedPreviousFillUp?: boolean;
 };
 
@@ -46,10 +46,16 @@ export type ServiceReminder = {
   date: string; // Unified date for timeline
 };
 
+export type TripExpense = {
+  description: string;
+  amount: number;
+};
+
 export type Trip = {
     id: string;
     vehicleId: string;
     userId: string;
+    username: string;
     tripType: string;
     destination: string;
     notes?: string;
@@ -58,6 +64,7 @@ export type Trip = {
     endDate?: string; // ISO datetime string
     endOdometer?: number;
     status: 'active' | 'completed';
+    expenses?: TripExpense[];
 };
 
 export type ProcessedFuelLog = FuelLog & {
