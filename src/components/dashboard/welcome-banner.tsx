@@ -2,7 +2,7 @@
 'use client';
 
 import Image from 'next/image';
-import type { Vehicle, FuelLog, ProcessedFuelLog } from '@/lib/types';
+import type { Vehicle, ProcessedFuelLog } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import AddFuelLogDialog from './add-fuel-log-dialog';
 import { useEffect, useState } from 'react';
@@ -30,8 +30,6 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
 
       setIsLoading(true);
       try {
-        // Assume 100% fuel after a fill-up, otherwise make a rough estimate.
-        // A more complex calculation could track fuel used since last log.
         const currentFuelLevelPercent = lastLog?.isFillUp ? 100 : 80;
 
         const output = await ai.estimateFuelStop({
@@ -61,20 +59,17 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
 
   return (
     <Card className="overflow-hidden">
-        <div className="flex flex-col md:flex-row">
-            <div className="flex-1 p-6">
+        <div className="flex flex-col">
+            <div className="p-6 pb-4">
                 <CardHeader className="p-0">
                     <CardTitle className="font-headline text-3xl">
-                        Bienvenido a MotorLog
+                        {vehicle.make} {vehicle.model}
                     </CardTitle>
                     <CardDescription className="text-base">
-                        Gestionando tu {vehicle.make} {vehicle.model} ({vehicle.year})
+                        {vehicle.year} - {vehicle.plate}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0 pt-6">
-                    <p className="text-muted-foreground mb-4">
-                        Aquí tienes un resumen del rendimiento y los próximos mantenimientos de tu vehículo. Añade una nueva recarga para mantener tus datos al día.
-                    </p>
                     <div className="flex flex-wrap items-center gap-4">
                       {vehicle && <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} vehicle={vehicle} />}
                       {vehicle && (
@@ -90,8 +85,6 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
                         <div className="text-sm text-muted-foreground">
                             <span>Autonomía est: <b>{Math.round(estimate.estimatedDistanceToEmptyKm)} km</b></span>
                             <span className="mx-2">|</span>
-                            <span>Odóm. est: <b>{Math.round(estimate.estimatedOdometerAtEmpty).toLocaleString()} km</b></span>
-                             <span className="mx-2">|</span>
                             <span>Próxima recarga: <b>{formatDate(estimate.estimatedRefuelDate)}</b></span>
                         </div>
                       )}
@@ -99,12 +92,12 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
                 </CardContent>
             </div>
              {vehicle.imageUrl && (
-                <div className="relative md:w-1/3 min-h-[200px] md:min-h-0 bg-black/5">
+                <div className="relative w-full h-48 sm:h-64 bg-black/5">
                     <Image
                         src={vehicle.imageUrl}
                         alt={`${vehicle.make} ${vehicle.model}`}
                         fill
-                        className="object-contain"
+                        className="object-cover"
                         data-ai-hint={vehicle.imageHint}
                     />
                 </div>
