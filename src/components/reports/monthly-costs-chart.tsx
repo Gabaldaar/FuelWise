@@ -23,11 +23,16 @@ export function MonthlyCostsChart({ data }: MonthlyCostsChartProps) {
       ...item,
       combustible: parseFloat(item.combustible.toFixed(2)),
       servicios: parseFloat(item.servicios.toFixed(2)),
+      total: parseFloat(item.total.toFixed(2)),
     }));
   }, [data]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const combustible = payload.find((p: any) => p.dataKey === 'combustible')?.value || 0;
+      const servicios = payload.find((p: any) => p.dataKey === 'servicios')?.value || 0;
+      const total = payload.find((p: any) => p.dataKey === 'total')?.value || 0;
+
       return (
         <div className="rounded-lg border bg-background p-2 shadow-sm">
           <div className="grid grid-cols-2 gap-x-2 gap-y-1">
@@ -39,14 +44,17 @@ export function MonthlyCostsChart({ data }: MonthlyCostsChartProps) {
               <div className="h-2 w-2 shrink-0 rounded-full mr-1" style={{ backgroundColor: 'hsl(var(--chart-1))' }} />
               <div className="text-xs text-muted-foreground">Combustible</div>
             </div>
-            <div className="text-right text-xs">${payload[0].value.toFixed(2)}</div>
+            <div className="text-right text-xs">${combustible.toFixed(2)}</div>
             <div className="flex items-center">
               <div className="h-2 w-2 shrink-0 rounded-full mr-1" style={{ backgroundColor: 'hsl(var(--chart-2))' }} />
               <div className="text-xs text-muted-foreground">Servicios</div>
             </div>
-             <div className="text-right text-xs">${payload[1].value.toFixed(2)}</div>
-             <div className="font-semibold text-sm">Total</div>
-             <div className="font-semibold text-right text-sm">${(payload[0].value + payload[1].value).toFixed(2)}</div>
+             <div className="text-right text-xs">${servicios.toFixed(2)}</div>
+             <div className="flex items-center">
+              <div className="h-2 w-2 shrink-0 rounded-full mr-1" style={{ backgroundColor: 'hsl(var(--chart-4))' }} />
+              <div className="font-semibold text-sm">Total</div>
+            </div>
+             <div className="font-semibold text-right text-sm">${total.toFixed(2)}</div>
           </div>
         </div>
       );
@@ -86,8 +94,9 @@ export function MonthlyCostsChart({ data }: MonthlyCostsChartProps) {
                 content={<CustomTooltip />}
               />
               <Legend wrapperStyle={{fontSize: "0.8rem"}} />
-              <Bar dataKey="combustible" name="Combustible" stackId="a" fill="hsl(var(--chart-1))" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="servicios" name="Servicios" stackId="a" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="combustible" name="Combustible" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="servicios" name="Servicios" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="total" name="Total" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
