@@ -9,7 +9,7 @@ import type { EstimateFuelStopOutput } from '@/ai/flows/estimate-fuel-stop';
 import { useToast } from '@/hooks/use-toast';
 import { ai } from '@/ai/client';
 import { formatDate } from '@/lib/utils';
-import { Loader2, Wrench, Plus } from 'lucide-react';
+import { Loader2, Wrench, Plus, Gauge } from 'lucide-react';
 import AddServiceReminderDialog from './add-service-reminder-dialog';
 import { Button } from '../ui/button';
 
@@ -76,10 +76,10 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
             </div>
             )}
              <CardContent className="p-6 space-y-4">
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="flex items-center gap-2">
                     {vehicle && (
                       <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} vehicle={vehicle}>
-                        <Button size="sm" className="w-full sm:w-auto">
+                        <Button size="sm" className="w-auto">
                           <Plus className="-ml-1 mr-2 h-4 w-4" />
                           Añadir Recarga
                         </Button>
@@ -87,7 +87,7 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
                     )}
                     {vehicle && (
                     <AddServiceReminderDialog vehicleId={vehicle.id} lastOdometer={lastLog?.odometer}>
-                        <Button variant="secondary" size="sm" className="w-full sm:w-auto">
+                        <Button variant="secondary" size="sm" className="w-auto">
                           <Wrench className="mr-2 h-4 w-4" />
                           Añadir Recordatorio
                         </Button>
@@ -100,7 +100,10 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
                     <div className="text-sm text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
                         <span>Autonomía est: <b>{Math.round(estimate.estimatedDistanceToEmptyKm)} km</b></span>
                         <span>Próx. recarga: <b>{formatDate(estimate.estimatedRefuelDate)}</b></span>
-                        <span>Odómetro est: <b>{Math.round(estimate.estimatedOdometerAtEmpty).toLocaleString()} km</b></span>
+                        <span className="flex items-center gap-1">
+                          <Gauge className="h-3 w-3" />
+                          <b>{Math.round(estimate.estimatedOdometerAtEmpty).toLocaleString()} km</b>
+                        </span>
                     </div>
                     )}
                 </div>
