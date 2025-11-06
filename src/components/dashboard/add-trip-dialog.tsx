@@ -37,6 +37,7 @@ import { doc, collection, query, orderBy } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Separator } from '../ui/separator';
+import { Label } from '../ui/label';
 
 const expenseSchema = z.object({
   description: z.string().min(1, 'La descripción es obligatoria.'),
