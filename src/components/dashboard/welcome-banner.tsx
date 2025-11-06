@@ -80,6 +80,8 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
                         <div className="text-sm text-muted-foreground">
                             <span>Autonomía est: <b>{Math.round(estimate.estimatedDistanceToEmptyKm)} km</b></span>
                             <span className="mx-2">|</span>
+                            <span>Odóm. est: <b>{Math.round(estimate.estimatedOdometerAtEmpty).toLocaleString()} km</b></span>
+                             <span className="mx-2">|</span>
                             <span>Próxima recarga: <b>{formatDate(estimate.estimatedRefuelDate)}</b></span>
                         </div>
                       )}
