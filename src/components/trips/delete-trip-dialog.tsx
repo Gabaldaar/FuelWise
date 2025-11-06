@@ -37,7 +37,7 @@ export default function DeleteTripDialog({
   const firestore = useFirestore();
 
   const handleDelete = async () => {
-    if (!user || !firestore) {
+    if (!user) {
       toast({
         variant: 'destructive',
         title: 'Error de autenticación',

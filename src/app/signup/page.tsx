@@ -47,15 +47,16 @@ export default function SignupPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!auth || !firestore) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Servicios de Firebase no disponibles.',
-      });
-      return;
-    }
     setIsLoading(true);
+    if (!auth || !firestore) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Servicios de Firebase no disponibles.'
+        });
+        setIsLoading(false);
+        return;
+    }
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;

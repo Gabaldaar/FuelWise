@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -36,7 +37,7 @@ export default function DeleteFuelLogDialog({
   const firestore = useFirestore();
 
   const handleDelete = async () => {
-    if (!user || !firestore) {
+    if (!user) {
         toast({
             variant: "destructive",
             title: "Error de autenticación",

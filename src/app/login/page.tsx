@@ -41,15 +41,16 @@ export default function LoginPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!auth) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Servicio de autenticación no disponible.',
-      });
-      return;
-    }
     setIsLoading(true);
+    if (!auth) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Servicio de autenticación no disponible.'
+        });
+        setIsLoading(false);
+        return;
+    }
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({

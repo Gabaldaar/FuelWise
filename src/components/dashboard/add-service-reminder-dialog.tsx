@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -94,7 +95,7 @@ export default function AddServiceReminderDialog({ vehicleId, reminder, children
   const isEditing = !!reminder;
 
   const serviceTypesQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
+    if (!user) return null;
     return query(collection(firestore, 'service_types'), orderBy('name'));
   }, [firestore, user]);
 
@@ -136,7 +137,7 @@ export default function AddServiceReminderDialog({ vehicleId, reminder, children
 
 
   async function onSubmit(values: FormValues) {
-    if (!user || !firestore) {
+    if (!user) {
         toast({
             variant: "destructive",
             title: "Error",
@@ -175,7 +176,7 @@ export default function AddServiceReminderDialog({ vehicleId, reminder, children
     };
 
     if (isEditing && values.isCompleted && values.isRecurring && values.recurrenceIntervalKm && values.completedOdometer) {
-        const originalReminderRef = doc(firestore, 'vehicles', vehicleId, reminder.id);
+        const originalReminderRef = doc(firestore, 'vehicles', vehicleId, 'service_reminders', reminder.id);
         const completedData = {
           ...reminder,
           ...reminderData,

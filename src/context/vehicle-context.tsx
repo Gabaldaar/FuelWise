@@ -26,7 +26,7 @@ export const VehicleProvider = ({ children }: { children: ReactNode }) => {
   const firestore = useFirestore();
 
   const vehiclesQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
+    if (!user) return null;
     // Query the top-level 'vehicles' collection
     return query(collection(firestore, 'vehicles'), orderBy('make'));
   }, [firestore, user]);

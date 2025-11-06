@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -84,19 +85,19 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
   const isEditing = !!fuelLog;
 
   const userProfileRef = useMemoFirebase(() => {
-    if (!authUser || !firestore) return null;
+    if (!authUser) return null;
     return doc(firestore, 'users', authUser.uid);
   }, [firestore, authUser]);
 
   const { data: userProfile } = useDoc<User>(userProfileRef);
 
   const fuelTypesQuery = useMemoFirebase(() => {
-    if (!authUser || !firestore) return null;
+    if (!authUser) return null;
     return query(collection(firestore, 'fuel_types'), orderBy('name'));
   }, [firestore, authUser]);
   
   const gasStationsQuery = useMemoFirebase(() => {
-    if (!authUser || !firestore) return null;
+    if (!authUser) return null;
     return query(collection(firestore, 'gas_stations'), orderBy('name'));
   }, [firestore, authUser]);
 
@@ -160,7 +161,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
 
 
   async function onSubmit(values: FormValues) {
-    if (!authUser || !userProfile || !firestore) {
+    if (!authUser || !userProfile) {
         toast({
             variant: "destructive",
             title: "Error",

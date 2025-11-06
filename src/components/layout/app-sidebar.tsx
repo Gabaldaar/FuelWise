@@ -38,14 +38,13 @@ function UserInfo() {
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => {
-    if (!authUser || !firestore) return null;
+    if (!authUser) return null;
     return doc(firestore, 'users', authUser.uid);
   }, [firestore, authUser]);
 
   const { data: userProfile } = useDoc<User>(userProfileRef);
   
   const handleSignOut = () => {
-    if (!auth) return;
     signOut(auth);
     router.push('/login');
   };

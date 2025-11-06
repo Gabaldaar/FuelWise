@@ -66,7 +66,7 @@ export default function SettingsList({ title, description, items, collectionName
   };
 
   const handleDelete = (itemId: string) => {
-    if (!user || !firestore) return;
+    if (!user) return;
     const itemRef = doc(firestore, collectionName, itemId);
     deleteDocumentNonBlocking(itemRef);
     toast({
@@ -76,7 +76,7 @@ export default function SettingsList({ title, description, items, collectionName
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    if (!user || !firestore) return;
+    if (!user) return;
 
     if (editingItem) {
       // Update

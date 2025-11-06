@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -22,13 +23,11 @@ import { deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 interface DeleteServiceReminderDialogProps {
   vehicleId: string;
   reminderId: string;
-  children: React.ReactNode;
 }
 
 export default function DeleteServiceReminderDialog({
   vehicleId,
   reminderId,
-  children
 }: DeleteServiceReminderDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,7 +36,7 @@ export default function DeleteServiceReminderDialog({
   const firestore = useFirestore();
 
   const handleDelete = async () => {
-    if (!user || !firestore) {
+    if (!user) {
       toast({
         variant: 'destructive',
         title: 'Error de autenticación',
@@ -61,7 +60,10 @@ export default function DeleteServiceReminderDialog({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        {children}
+        <Button variant="outline" size="icon" className="text-destructive hover:text-destructive">
+            <Trash2 className="h-4 w-4" />
+            <span className="sr-only">Eliminar</span>
+        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

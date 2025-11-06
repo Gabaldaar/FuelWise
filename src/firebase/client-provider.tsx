@@ -9,8 +9,9 @@ interface FirebaseClientProviderProps {
 }
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
-  // The Firebase instances are now imported directly from the client-side firebase/index.ts
-  // This ensures they are only initialized once.
+
+  // The services are now initialized directly in the index file
+  // This provider ensures that the context is available to all client components.
   return (
     <FirebaseProvider
       firebaseApp={firebaseApp}

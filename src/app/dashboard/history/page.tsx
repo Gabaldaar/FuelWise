@@ -91,7 +91,7 @@ export default function HistoryPage() {
   const [isLoadingEstimate, setIsLoadingEstimate] = useState(false);
 
   const fuelLogsQuery = useMemoFirebase(() => {
-    if (!user || !vehicle || !firestore) return null;
+    if (!user || !vehicle) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'fuel_records'),
       orderBy('odometer', 'desc')
@@ -99,14 +99,14 @@ export default function HistoryPage() {
   }, [firestore, user, vehicle]);
 
   const remindersQuery = useMemoFirebase(() => {
-    if (!user || !vehicle || !firestore) return null;
+    if (!user || !vehicle) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'service_reminders')
     );
   }, [firestore, user, vehicle]);
   
   const tripsQuery = useMemoFirebase(() => {
-    if (!user || !vehicle || !firestore) return null;
+    if (!user || !vehicle) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'trips'),
       orderBy('endDate', 'desc')
@@ -114,7 +114,7 @@ export default function HistoryPage() {
   }, [firestore, user, vehicle]);
   
   const lastFuelLogQuery = useMemoFirebase(() => {
-    if (!user || !vehicle || !firestore) return null;
+    if (!user || !vehicle) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'fuel_records'),
       orderBy('odometer', 'desc'),

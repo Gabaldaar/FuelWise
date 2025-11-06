@@ -85,13 +85,13 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
   const isEditing = !!trip;
 
   const userProfileRef = useMemoFirebase(() => {
-    if (!authUser || !firestore) return null;
+    if (!authUser) return null;
     return doc(firestore, 'users', authUser.uid);
   }, [firestore, authUser]);
   const { data: userProfile } = useDoc<User>(userProfileRef);
   
   const tripTypesQuery = useMemoFirebase(() => {
-    if (!authUser || !firestore) return null;
+    if (!authUser) return null;
     return query(collection(firestore, 'trip_types'), orderBy('name'));
   }, [firestore, authUser]);
   const { data: tripTypes, isLoading: isLoadingTripTypes } = useCollection<ConfigItem>(tripTypesQuery);
@@ -135,7 +135,7 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
 
 
   async function onSubmit(values: FormValues) {
-    if (!authUser || !userProfile || !firestore) {
+    if (!authUser || !userProfile) {
         toast({ variant: "destructive", title: "Error", description: "Debes iniciar sesión." });
         return;
     }

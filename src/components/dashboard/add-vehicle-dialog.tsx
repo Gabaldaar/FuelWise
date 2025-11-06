@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -61,7 +62,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
   const isEditing = !!vehicle;
 
   const fuelTypesQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
+    if (!user) return null;
     return query(collection(firestore, 'fuel_types'), orderBy('name'));
   }, [firestore, user]);
 
@@ -82,7 +83,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
   });
 
   async function onSubmit(values: FormValues) {
-    if (!user || !firestore) {
+    if (!user) {
         toast({
             variant: "destructive",
             title: "Error de autenticación",

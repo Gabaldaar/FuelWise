@@ -7,7 +7,7 @@ import { VehicleProvider } from '@/context/vehicle-context';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { FirebaseClientProvider } from '@/firebase';
 import { PreferencesProvider } from '@/context/preferences-context';
 
 function DashboardLayoutContent({
