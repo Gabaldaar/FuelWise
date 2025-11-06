@@ -10,7 +10,9 @@ import type { EstimateFuelStopOutput } from '@/ai/flows/estimate-fuel-stop';
 import { useToast } from '@/hooks/use-toast';
 import { ai } from '@/ai/client';
 import { formatDate } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Wrench } from 'lucide-react';
+import AddServiceReminderDialog from './add-service-reminder-dialog';
+import { Button } from '../ui/button';
 
 interface WelcomeBannerProps {
   vehicle: Vehicle & { averageConsumptionKmPerLiter?: number };
@@ -47,7 +49,7 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
         toast({
           variant: 'destructive',
           title: 'Error de Estimación',
-          description: 'No se pudo estimar la próxima parada de combustible.',
+          description: 'No se pudo estimar la próxima parada de recarga.',
         });
       } finally {
         setIsLoading(false);
@@ -75,6 +77,14 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
                     </p>
                     <div className="flex flex-wrap items-center gap-4">
                       {vehicle && <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} vehicle={vehicle} />}
+                      {vehicle && (
+                        <AddServiceReminderDialog vehicleId={vehicle.id} lastOdometer={lastLog?.odometer}>
+                          <Button variant="outline">
+                            <Wrench className="mr-2 h-4 w-4" />
+                            Añadir Recordatorio
+                          </Button>
+                        </AddServiceReminderDialog>
+                      )}
                       {isLoading && <Loader2 className="h-5 w-5 animate-spin" />}
                       {estimate && !isLoading && (
                         <div className="text-sm text-muted-foreground">
