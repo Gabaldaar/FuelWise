@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -39,15 +40,10 @@ export default function VehicleSelector() {
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[250px] justify-between"
+          className="w-auto justify-between"
         >
-          <div className="flex items-center gap-2">
-            <Car className="h-4 w-4" />
-            {selectedVehicle
-              ? `${selectedVehicle.make} ${selectedVehicle.model}`
-              : 'Seleccionar vehículo...'}
-          </div>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className="hidden sm:inline">Cambiar</span>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 sm:ml-2" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[250px] p-0">
