@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, Plus, Loader2, Search } from 'lucide-react';
+import { CalendarIcon, Plus, Loader2, Search, Check, ChevronsUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -45,6 +45,8 @@ import { collection, doc, query, orderBy } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { FuelLog, User, Vehicle, ConfigItem } from '@/lib/types';
 import FindNearbyGasStationsDialog from '../ai/find-nearby-gas-stations-dialog';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+
 
 const formSchema = z.object({
   date: z.date({
@@ -79,6 +81,8 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const [lastEdited, setLastEdited] = useState<LastEditedField>(null);
+  const [popoverOpen, setPopoverOpen] = useState(false)
+
 
   const { user: authUser } = useUser();
   const firestore = useFirestore();
@@ -222,6 +226,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
 
   const handleGasStationSelect = (name: string) => {
     setValue('gasStation', name, { shouldValidate: true });
+    setPopoverOpen(false);
   };
 
   return (
@@ -374,16 +379,45 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
                   <FormItem>
                     <FormLabel>Gasolinera</FormLabel>
                      <div className="flex items-center gap-2">
-                        <FormControl>
-                            <Input 
-                                placeholder={isLoadingGasStations ? "Cargando..." : "Escribe o busca"}
-                                {...field}
-                                value={field.value ?? ''}
-                                list="gas-stations-list"
-                                disabled={isLoadingGasStations}
-                                className="flex-1"
-                            />
-                        </FormControl>
+                        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                              >
+                                {field.value || (isLoadingGasStations ? "Cargando..." : "Seleccionar o escribir")}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            <Command>
+                              <CommandInput 
+                                placeholder="Buscar o crear gasolinera..." 
+                                onValueChange={(value) => field.onChange(value)}
+                              />
+                              <CommandList>
+                                <CommandEmpty>No se encontró. Puedes crearla.</CommandEmpty>
+                                <CommandGroup>
+                                  {gasStations?.map((station) => (
+                                    <CommandItem
+                                      value={station.name}
+                                      key={station.id}
+                                      onSelect={() => {
+                                        handleGasStationSelect(station.name);
+                                      }}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", station.name === field.value ? "opacity-100" : "opacity-0")} />
+                                      {station.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                         <FindNearbyGasStationsDialog onStationSelect={handleGasStationSelect}>
                             <Button type="button" variant="outline" size="icon" className="shrink-0">
                                 <Search className="h-4 w-4" />
@@ -391,11 +425,6 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
                             </Button>
                         </FindNearbyGasStationsDialog>
                     </div>
-                     <datalist id="gas-stations-list">
-                        {gasStations?.map(station => (
-                          <option key={station.id} value={station.name} />
-                        ))}
-                    </datalist>
                     <FormMessage />
                   </FormItem>
                 )}
