@@ -229,6 +229,10 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
     setPopoverOpen(false);
   };
 
+  const handleNearbyGasStationSelect = (name: string) => {
+    setValue('gasStation', name, { shouldValidate: true });
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -378,14 +382,14 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Gasolinera</FormLabel>
-                     <div className="flex items-center gap-2">
+                     <div className="flex flex-wrap items-center gap-2">
                         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
                                 variant="outline"
                                 role="combobox"
-                                className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                                className={cn("w-full justify-between flex-1 min-w-[150px]", !field.value && "text-muted-foreground")}
                               >
                                 {field.value || (isLoadingGasStations ? "Cargando..." : "Seleccionar o escribir")}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -418,7 +422,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
                             </Command>
                           </PopoverContent>
                         </Popover>
-                        <FindNearbyGasStationsDialog onStationSelect={handleGasStationSelect}>
+                        <FindNearbyGasStationsDialog onStationSelect={handleNearbyGasStationSelect}>
                             <Button type="button" variant="outline" size="icon" className="shrink-0">
                                 <Search className="h-4 w-4" />
                                 <span className="sr-only">Buscar gasolineras cercanas</span>
