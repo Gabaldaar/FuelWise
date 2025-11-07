@@ -86,7 +86,20 @@ export default function HistoryPage() {
   const { data: trips, isLoading: isLoadingTrips } = useCollection<Trip>(tripsQuery);
   
   const lastOdometer = allFuelLogs?.[0]?.odometer || 0;
-  
+
+  const avgConsumption = useMemo(() => {
+    if (!allFuelLogs) return vehicle?.averageConsumptionKmPerLiter || 0;
+    const consumptionLogs = allFuelLogs.filter(log => 'consumption' in log && log.consumption && log.consumption > 0);
+    return consumptionLogs.length > 0
+      ? consumptionLogs.reduce((acc, log) => acc + (log.consumption || 0), 0) / consumptionLogs.length
+      : vehicle?.averageConsumptionKmPerLiter || 0;
+  }, [allFuelLogs, vehicle?.averageConsumptionKmPerLiter]);
+
+  const vehicleWithAvgConsumption = useMemo(() => {
+    if (!vehicle) return null;
+    return { ...vehicle, averageConsumptionKmPerLiter: avgConsumption };
+  }, [vehicle, avgConsumption]);
+
   const timelineItems = useMemo((): TimelineHistoryItem[] => {
     const combined: TimelineHistoryItem[] = [];
 
@@ -165,18 +178,6 @@ export default function HistoryPage() {
     
   const lastLogForNewEntry = allFuelLogs?.[0];
 
-  const avgConsumption = useMemo(() => {
-    if (!allFuelLogs) return vehicle?.averageConsumptionKmPerLiter || 0;
-    const consumptionLogs = allFuelLogs.filter(log => 'consumption' in log && log.consumption && log.consumption > 0);
-    return consumptionLogs.length > 0
-      ? consumptionLogs.reduce((acc, log) => acc + (log.consumption || 0), 0) / consumptionLogs.length
-      : vehicle?.averageConsumptionKmPerLiter || 0;
-  }, [allFuelLogs, vehicle?.averageConsumptionKmPerLiter]);
-
-  const vehicleWithAvgConsumption = useMemo(() => {
-    if (!vehicle) return null;
-    return { ...vehicle, averageConsumptionKmPerLiter: avgConsumption };
-  }, [vehicle, avgConsumption]);
   
   const isLoading = isLoadingLogs || isLoadingReminders || isLoadingTrips;
 
