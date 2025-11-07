@@ -36,9 +36,6 @@ import DeleteServiceReminderDialog from '@/components/dashboard/delete-service-r
 import { usePreferences } from '@/context/preferences-context';
 import { differenceInDays, differenceInHours, differenceInMinutes, startOfDay, endOfDay, subDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import type { EstimateFuelStopOutput } from '@/ai/flows/estimate-fuel-stop';
-import { ai } from '@/ai/client';
-import EstimatedRefuelCard from '@/components/dashboard/estimated-refuel-card';
 import AddTripDialog from '@/components/dashboard/add-trip-dialog';
 import DeleteTripDialog from '@/components/trips/delete-trip-dialog';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
@@ -51,46 +48,11 @@ type TimelineHistoryItem = {
     data: ProcessedFuelLog | ProcessedServiceReminder | Trip | {};
 };
 
-function processFuelLogsForAvg(logs: ProcessedFuelLog[]): { processedLogs: ProcessedFuelLog[], avgConsumption: number } {
-  const sortedLogs = logs
-    .filter(log => log && typeof log.date === 'string')
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-  const processed = sortedLogs.map((log, index) => {
-    if (index === 0) {
-      return { ...log };
-    }
-    const prevLog = sortedLogs[index - 1];
-    if (!prevLog) return {...log};
-    
-    const distanceTraveled = log.odometer - prevLog.odometer;
-    const consumption = prevLog.isFillUp && !log.missedPreviousFillUp && distanceTraveled > 0 && log.liters > 0 
-      ? distanceTraveled / log.liters 
-      : 0;
-    
-    return {
-      ...log,
-      distanceTraveled,
-      consumption: parseFloat(consumption.toFixed(2)),
-    };
-  }).reverse(); 
-
-  const consumptionLogs = processed.filter(log => log.consumption && log.consumption > 0);
-  const avgConsumption = consumptionLogs.length > 0 
-    ? consumptionLogs.reduce((acc, log) => acc + (log.consumption || 0), 0) / consumptionLogs.length
-    : 0;
-
-  return { processedLogs: processed, avgConsumption };
-}
-
-
 export default function HistoryPage() {
   const { selectedVehicle: vehicle } = useVehicles();
   const { user } = useUser();
   const firestore = useFirestore();
   const { urgencyThresholdDays, urgencyThresholdKm } = usePreferences();
-  const [estimate, setEstimate] = useState<EstimateFuelStopOutput | null>(null);
-  const [isLoadingEstimate, setIsLoadingEstimate] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   const fuelLogsQuery = useMemoFirebase(() => {
@@ -131,44 +93,7 @@ export default function HistoryPage() {
   const { data: lastFuelLogResult, isLoading: isLoadingLastLog } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
 
   const lastOdometer = lastFuelLogResult?.[0]?.odometer || 0;
-  const lastLogForEstimate = fuelLogs?.[0];
-
-  const { avgConsumption } = useMemo(() => {
-      if (!fuelLogs) return { avgConsumption: vehicle?.averageConsumptionKmPerLiter || 0 };
-      const { avgConsumption } = processFuelLogsForAvg(fuelLogs);
-      return { avgConsumption: avgConsumption > 0 ? avgConsumption : vehicle?.averageConsumptionKmPerLiter || 0 };
-  }, [fuelLogs, vehicle]);
-
-
-  useEffect(() => {
-    const getEstimate = async () => {
-      if (!vehicle || !avgConsumption || !lastLogForEstimate) return;
-
-      setIsLoadingEstimate(true);
-      try {
-        const currentFuelLevelPercent = lastLogForEstimate?.isFillUp ? 100 : 80;
-
-        const output = await ai.estimateFuelStop({
-          vehicleMake: vehicle.make,
-          vehicleModel: vehicle.model,
-          vehicleYear: vehicle.year,
-          fuelCapacityLiters: vehicle.fuelCapacityLiters,
-          averageConsumptionKmPerLiter: avgConsumption,
-          currentFuelLevelPercent: currentFuelLevelPercent,
-          currentOdometer: lastLogForEstimate.odometer,
-        });
-        setEstimate(output);
-      } catch (error) {
-        console.error('Error getting fuel estimate:', error);
-      } finally {
-        setIsLoadingEstimate(false);
-      }
-    };
-
-    getEstimate();
-  }, [vehicle, lastLogForEstimate, avgConsumption]);
-
-
+  
   const timelineItems = useMemo((): TimelineHistoryItem[] => {
     const combined: TimelineHistoryItem[] = [];
 
@@ -277,7 +202,6 @@ export default function HistoryPage() {
             </div>
         ) : (
             <div className='space-y-2'>
-              <EstimatedRefuelCard estimate={estimate} isLoading={isLoadingEstimate} />
               {timelineItems.length > 0 ? (
                   <Accordion type="single" collapsible className="w-full">
                     {timelineItems.map((item, index) => (

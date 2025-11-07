@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, Plus, Loader2, MapPin } from 'lucide-react';
+import { CalendarIcon, Plus, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -44,7 +44,6 @@ import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@
 import { collection, doc, query, orderBy } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { FuelLog, User, Vehicle, ConfigItem } from '@/lib/types';
-import FindGasStationsDialog from './find-gas-stations-dialog';
 
 const formSchema = z.object({
   date: z.date({
@@ -162,10 +161,6 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
       setValue('totalCost', format(newCost), { shouldValidate: true });
     }
   }, [watchedValues.totalCost, watchedValues.liters, watchedValues.pricePerLiter, lastEdited, setValue]);
-
-  const handleGasStationSelect = (name: string) => {
-    setValue('gasStation', name, { shouldValidate: true });
-  };
 
 
   async function onSubmit(values: FormValues) {
@@ -373,28 +368,20 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Gasolinera</FormLabel>
-                    <div className="flex gap-2">
-                        <FormControl>
-                            <Input 
-                                placeholder={isLoadingGasStations ? "Cargando..." : "Escribe o busca"}
-                                {...field}
-                                value={field.value ?? ''}
-                                list="gas-stations-list"
-                                disabled={isLoadingGasStations}
-                            />
-                        </FormControl>
-                         <datalist id="gas-stations-list">
-                            {gasStations?.map(station => (
-                              <option key={station.id} value={station.name} />
-                            ))}
-                        </datalist>
-                      <FindGasStationsDialog onStationSelect={handleGasStationSelect}>
-                        <Button type="button" variant="outline" size="icon">
-                            <MapPin className="h-4 w-4" />
-                            <span className="sr-only">Buscar gasolineras cercanas</span>
-                        </Button>
-                      </FindGasStationsDialog>
-                    </div>
+                    <FormControl>
+                        <Input 
+                            placeholder={isLoadingGasStations ? "Cargando..." : "Escribe o busca"}
+                            {...field}
+                            value={field.value ?? ''}
+                            list="gas-stations-list"
+                            disabled={isLoadingGasStations}
+                        />
+                    </FormControl>
+                     <datalist id="gas-stations-list">
+                        {gasStations?.map(station => (
+                          <option key={station.id} value={station.name} />
+                        ))}
+                    </datalist>
                     <FormMessage />
                   </FormItem>
                 )}
