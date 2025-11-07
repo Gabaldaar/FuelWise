@@ -23,7 +23,7 @@ export default function ServiceReminders({ data }: ServiceRemindersProps) {
         <CardDescription>Próximos mantenimientos programados.</CardDescription>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[218px]">
+        <ScrollArea className="h-[300px]">
           <div className="space-y-4">
             {data.length > 0 ? (
               data.map((reminder) => (
