@@ -16,7 +16,7 @@ const GasStationOutputSchema = z.object({
   name: z.string().describe('The name of the gas station.'),
   address: z.string().describe('The address of the gas station.'),
   distance: z.string().describe('The distance from the user\'s location.'),
-  mapsUrl: z.string().url().describe('A URL to view the gas station on Google Maps.'),
+  mapsUrl: z.string().url().describe('A URL to get directions to the gas station on Google Maps.'),
 });
 
 export type GasStationInput = z.infer<typeof GasStationInputSchema>;
@@ -64,21 +64,10 @@ export async function findNearbyGasStations(input: GasStationInput): Promise<Gas
         name: place.name || 'N/A',
         address: place.vicinity || 'Dirección no disponible',
         distance: `${distanceInKm.toFixed(1)} km`,
-        mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name || '')}&query_place_id=${place.place_id}`,
+        mapsUrl: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place.name || '')}&destination_place_id=${place.place_id}`,
       };
     })
     .filter((s): s is GasStationOutput => s !== null);
 
   return stations.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
 }
-
-// We keep the Genkit flow definition for potential future use with other tools or logging,
-// but we are not calling it from the client directly anymore.
-const findNearbyGasStationsFlow = ai.defineFlow(
-  {
-    name: 'findNearbyGasStationsFlow',
-    inputSchema: GasStationInputSchema,
-    outputSchema: z.array(GasStationOutputSchema),
-  },
-  findNearbyGasStations
-);

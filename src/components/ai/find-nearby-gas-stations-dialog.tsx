@@ -169,7 +169,7 @@ export default function FindNearbyGasStationsDialog({ children, onStationSelect 
                     <div className="font-semibold">{station.distance}</div>
                     <div className="flex gap-2">
                         <a href={station.mapsUrl} target="_blank" rel="noopener noreferrer">
-                            <Button variant="outline" size="sm"><Navigation className="h-4 w-4 mr-1"/> Ver en mapa</Button>
+                            <Button variant="outline" size="sm"><Navigation className="h-4 w-4 mr-1"/> Cómo Llegar</Button>
                         </a>
                         <Button size="sm" onClick={() => handleSelectStation(station.name)}>
                            Seleccionar
