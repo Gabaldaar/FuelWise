@@ -16,6 +16,7 @@ import type { GasStationResult } from '@/ai/flows/find-nearby-gas-stations';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { cn } from '@/lib/utils';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group';
 
 interface FindGasStationsDialogProps {
   onStationSelect?: (name: string) => void;
@@ -25,6 +26,12 @@ interface FindGasStationsDialogProps {
 type GeolocationState = 'idle' | 'loading' | 'success' | 'error';
 type SearchState = 'idle' | 'searching' | 'success' | 'error';
 
+const RADIUS_OPTIONS = [
+  { label: '5 km', value: 5000 },
+  { label: '10 km', value: 10000 },
+  { label: '25 km', value: 25000 },
+];
+
 export default function FindGasStationsDialog({ onStationSelect, children }: FindGasStationsDialogProps) {
   const [open, setOpen] = useState(false);
   const [locationState, setLocationState] = useState<GeolocationState>('idle');
@@ -32,6 +39,7 @@ export default function FindGasStationsDialog({ onStationSelect, children }: Fin
   const [stations, setStations] = useState<GasStationResult['stations']>([]);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const [radius, setRadius] = useState<number>(RADIUS_OPTIONS[0].value);
 
   const handleFindStations = () => {
     if (!('geolocation' in navigator)) {
@@ -42,15 +50,17 @@ export default function FindGasStationsDialog({ onStationSelect, children }: Fin
 
     setLocationState('loading');
     setError(null);
+    setSearchState('searching');
+    setStations([]);
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         setLocationState('success');
-        setSearchState('searching');
         try {
           const result = await ai.findNearbyGasStations({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
+            radius: radius,
           });
           setStations(result.stations);
           setSearchState('success');
@@ -92,12 +102,10 @@ export default function FindGasStationsDialog({ onStationSelect, children }: Fin
             description: `${name} ha sido añadida al campo de gasolinera.`,
         })
     }
-    // If no onStationSelect is provided, clicking does nothing,
-    // allowing the user to just view or get directions.
   };
   
   const handleGetDirections = (e: React.MouseEvent, station: GasStationResult['stations'][0]) => {
-    e.stopPropagation(); // Prevent the station from being selected when clicking the directions button
+    e.stopPropagation();
     const url = `https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   }
@@ -129,38 +137,53 @@ export default function FindGasStationsDialog({ onStationSelect, children }: Fin
             }
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4 min-h-[200px]">
-          {locationState === 'idle' && searchState === 'idle' && (
-            <div className="flex flex-col items-center justify-center text-center h-full">
-              <p className="text-muted-foreground mb-4">
-                Haz clic en el botón para buscar gasolineras cerca de ti.
-              </p>
-              <Button onClick={handleFindStations}>
-                <Search className="mr-2 h-4 w-4" /> Buscar Gasolineras
+        <div className="space-y-4 py-4 min-h-[250px]">
+          {searchState !== 'searching' && (
+            <div className="flex flex-col items-center justify-center gap-4">
+              <ToggleGroup
+                type="single"
+                defaultValue={String(radius)}
+                onValueChange={(value) => {
+                  if (value) setRadius(Number(value));
+                }}
+                aria-label="Radio de búsqueda"
+              >
+                {RADIUS_OPTIONS.map(option => (
+                  <ToggleGroupItem key={option.value} value={String(option.value)} aria-label={option.label}>
+                    {option.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+              <Button onClick={handleFindStations} disabled={locationState === 'loading'}>
+                {locationState === 'loading' ? (
+                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="mr-2 h-4 w-4" />
+                )}
+                Buscar Gasolineras
               </Button>
             </div>
           )}
 
-          {(locationState === 'loading' || searchState === 'searching') && (
-            <div className="flex flex-col items-center justify-center text-center h-full">
+          {searchState === 'searching' && (
+            <div className="flex flex-col items-center justify-center text-center h-full pt-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
               <p className="font-semibold">
-                {locationState === 'loading' ? 'Obteniendo tu ubicación...' : 'Buscando gasolineras...'}
+                {locationState === 'loading' ? 'Obteniendo tu ubicación...' : `Buscando en un radio de ${radius/1000} km...`}
               </p>
               <p className="text-sm text-muted-foreground">Por favor, espera un momento.</p>
             </div>
           )}
 
           {(locationState === 'error' || searchState === 'error') && error && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="mt-4">
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
           {searchState === 'success' && (
-            <div className="space-y-2">
-                <p className="text-sm font-medium">Resultados encontrados:</p>
+            <div className="space-y-2 pt-4">
                 <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
                     {stations.length > 0 ? stations.map((station) => (
                         <div
@@ -188,7 +211,12 @@ export default function FindGasStationsDialog({ onStationSelect, children }: Fin
                                 </Button>
                             </div>
                         </div>
-                    )) : <p className="text-sm text-muted-foreground text-center py-4">No se encontraron resultados.</p>}
+                    )) : (
+                      <div className="text-center py-4">
+                        <p className="font-semibold">No se encontraron resultados</p>
+                        <p className="text-sm text-muted-foreground">Intenta ampliar el radio de búsqueda.</p>
+                      </div>
+                    )}
                 </div>
             </div>
           )}

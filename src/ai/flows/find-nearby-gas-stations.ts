@@ -13,6 +13,7 @@ import { z } from 'zod';
 const FindNearbyGasStationsInputSchema = z.object({
   latitude: z.number().describe("The user's current latitude."),
   longitude: z.number().describe("The user's current longitude."),
+  radius: z.number().optional().describe("The search radius in meters. Defaults to 5000."),
 });
 export type FindNearbyGasStationsInput = z.infer<typeof FindNearbyGasStationsInputSchema>;
 
@@ -44,7 +45,7 @@ const getNearbyGasStationsTool = ai.defineTool(
     inputSchema: FindNearbyGasStationsInputSchema,
     outputSchema: GasStationResultSchema,
   },
-  async ({ latitude, longitude }) => {
+  async ({ latitude, longitude, radius = 5000 }) => {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       console.error('CRITICAL: Google Maps API key is not configured.');
@@ -52,7 +53,6 @@ const getNearbyGasStationsTool = ai.defineTool(
       throw new Error('La clave de API de Google Maps no está configurada en el servidor.');
     }
 
-    const radius = 5000; // 5km radius
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=gas_station&key=${apiKey}`;
 
     try {
