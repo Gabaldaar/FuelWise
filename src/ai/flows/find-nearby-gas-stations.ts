@@ -44,11 +44,12 @@ const getNearbyGasStationsTool = ai.defineTool(
   async ({ latitude, longitude }) => {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      throw new Error('Google Maps API key is not configured. Please set GOOGLE_MAPS_API_KEY in your environment variables.');
+      console.error('CRITICAL: Google Maps API key is not configured.');
+      throw new Error('Google Maps API key is not configured. Please set GOOGLE_MAPS_API_KEY in your .env.local file.');
     }
 
     const radius = 5000; // 5km radius
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=gas_station&key=${apiKey}`;
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=gas_station&key=${apiKey}&timestamp=${new Date().getTime()}`;
 
     try {
       const response = await fetch(url);
@@ -56,11 +57,13 @@ const getNearbyGasStationsTool = ai.defineTool(
 
       if (!response.ok) {
         console.error('Google Places API Error (Not OK):', data);
-        throw new Error(`Failed to fetch gas stations. Status: ${response.status}. Message: ${data.error_message || 'No message'}`);
+        // This makes the error more specific, pulling from Google's response if available.
+        throw new Error(`Failed to fetch gas stations. Status: ${response.status}. Message: ${data.error_message || 'No specific error message provided by API.'}`);
       }
-
+      
+      // Handle API-level errors that still return a 200 OK status
       if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-        console.error('Google Places API Status Error:', data.error_message || data.status);
+        console.error('Google Places API Status Error:', data);
         throw new Error(`Google Places API error: ${data.error_message || data.status}`);
       }
       
@@ -88,12 +91,12 @@ const getNearbyGasStationsTool = ai.defineTool(
       return { stations };
 
     } catch (error) {
-      console.error('Error fetching from Google Places API:', error);
-      // Re-throw the original error if it's more specific, otherwise throw a generic one.
+      // Re-throw the original error to be caught by the parent flow, ensuring it's a clear Error object.
       if (error instanceof Error) {
-        throw error;
+          throw error;
       }
-      throw new Error('Could not retrieve gas stations from Google Places API.');
+      // Fallback for unexpected error types
+      throw new Error('An unexpected error occurred while retrieving gas stations from Google Places API.');
     }
   }
 );
