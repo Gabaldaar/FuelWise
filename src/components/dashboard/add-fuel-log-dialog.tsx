@@ -71,7 +71,7 @@ type LastEditedField = 'totalCost' | 'liters' | 'pricePerLiter' | null;
 interface AddFuelLogDialogProps {
     vehicleId: string;
     lastLog?: FuelLog;
-    fuelLog?: FuelLog;
+    fuelLog?: Partial<FuelLog>;
     children?: React.ReactNode;
     vehicle?: Vehicle;
 }
@@ -86,7 +86,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
 
   const { user: authUser } = useUser();
   const firestore = useFirestore();
-  const isEditing = !!fuelLog;
+  const isEditing = !!fuelLog?.id;
 
   const userProfileRef = useMemoFirebase(() => {
     if (!authUser) return null;
@@ -128,21 +128,23 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
   const watchedValues = watch();
 
   useEffect(() => {
-    const toLocaleString = (num: number | undefined) => num?.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '';
+    if (open) {
+        const toLocaleString = (num: number | undefined) => num?.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '';
 
-    const defaultVals = {
-      date: isEditing && fuelLog ? new Date(fuelLog.date) : new Date(),
-      odometer: isEditing && fuelLog ? fuelLog.odometer : undefined,
-      totalCost: isEditing && fuelLog ? toLocaleString(fuelLog.totalCost) : '',
-      liters: isEditing && fuelLog ? toLocaleString(fuelLog.liters) : '',
-      pricePerLiter: isEditing && fuelLog ? toLocaleString(fuelLog.pricePerLiter) : '',
-      fuelType: (isEditing && fuelLog?.fuelType) || vehicle?.defaultFuelType,
-      isFillUp: isEditing ? (fuelLog.isFillUp !== undefined ? fuelLog.isFillUp : true) : true,
-      gasStation: isEditing && fuelLog ? fuelLog.gasStation : '',
-      missedPreviousFillUp: (isEditing && fuelLog?.missedPreviousFillUp) || false,
-    };
-    form.reset(defaultVals);
-  }, [fuelLog, isEditing, form, open, vehicle]);
+        const defaultVals = {
+        date: fuelLog?.date ? new Date(fuelLog.date) : new Date(),
+        odometer: fuelLog?.odometer,
+        totalCost: toLocaleString(fuelLog?.totalCost),
+        liters: toLocaleString(fuelLog?.liters),
+        pricePerLiter: toLocaleString(fuelLog?.pricePerLiter),
+        fuelType: fuelLog?.fuelType || vehicle?.defaultFuelType,
+        isFillUp: fuelLog?.isFillUp !== undefined ? fuelLog.isFillUp : true,
+        gasStation: fuelLog?.gasStation || '',
+        missedPreviousFillUp: fuelLog?.missedPreviousFillUp || false,
+        };
+        form.reset(defaultVals);
+    }
+  }, [fuelLog, open, form, vehicle]);
 
 
   useEffect(() => {
@@ -198,7 +200,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
 
     setIsSubmitting(true);
     
-    const logId = isEditing ? fuelLog.id : doc(collection(firestore, '_')).id;
+    const logId = isEditing ? fuelLog!.id! : doc(collection(firestore, '_')).id;
     const fuelLogRef = doc(firestore, 'vehicles', vehicleId, 'fuel_records', logId);
 
     const fuelLogData = {

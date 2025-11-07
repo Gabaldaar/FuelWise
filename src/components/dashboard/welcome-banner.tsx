@@ -45,7 +45,7 @@ export default function WelcomeBanner({ vehicle, allFuelLogs, lastOdometer }: We
                                 vehicleId={vehicle.id} 
                                 vehicle={vehicle} 
                                 lastLog={[...allFuelLogs].sort((a,b) => b.odometer - a.odometer)[0]}
-                                fuelLog={{ gasStation: selectedStation } as any}
+                                fuelLog={{ gasStation: selectedStation }}
                             >
                                 <Button size="sm" className="w-auto">
                                 <Fuel className="mr-2 h-4 w-4" />
