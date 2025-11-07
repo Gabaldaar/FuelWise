@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency = 'USD') {
+export function formatCurrency(amount: number, currency = 'ARS') {
   if (isNaN(amount)) return '';
   // es-AR (Argentina) locale uses '.' for thousands and ',' for decimals.
   return new Intl.NumberFormat('es-AR', {
