@@ -4,7 +4,7 @@
  */
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { geocode, place, type Place } from '@googlemaps/google-maps-services-js';
+import { Client, type Place } from '@googlemaps/google-maps-services-js';
 
 const GasStationInputSchema = z.object({
   latitude: z.number().describe('The latitude of the user\'s current location.'),
@@ -28,7 +28,9 @@ export async function findNearbyGasStations(input: GasStationInput): Promise<Gas
     throw new Error("Google Maps API key is not configured. Please set the GOOGLE_MAPS_API_KEY environment variable.");
   }
   
-  const response = await place({
+  const client = new Client({});
+
+  const response = await client.placesNearby({
     params: {
       location: { lat: input.latitude, lng: input.longitude },
       radius: input.radius,
