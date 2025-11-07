@@ -73,7 +73,7 @@ const findNearbyGasStationsFlow = ai.defineFlow(
       model: 'googleai/gemini-2.5-flash',
     });
 
-    const toolRequest = llmResponse.toolRequest();
+    const toolRequest = llmResponse.toolRequest;
     if (!toolRequest) {
       // The model decided not to use the tool. Fallback.
       return { stations: [] };
