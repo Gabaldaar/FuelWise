@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -18,13 +17,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface FindGasStationsDialogProps {
-  onStationSelect: (name: string) => void;
+  onStationSelect?: (name: string) => void;
+  children: React.ReactNode;
 }
 
 type GeolocationState = 'idle' | 'loading' | 'success' | 'error';
 type SearchState = 'idle' | 'searching' | 'success' | 'error';
 
-export default function FindGasStationsDialog({ onStationSelect }: FindGasStationsDialogProps) {
+export default function FindGasStationsDialog({ onStationSelect, children }: FindGasStationsDialogProps) {
   const [open, setOpen] = useState(false);
   const [locationState, setLocationState] = useState<GeolocationState>('idle');
   const [searchState, setSearchState] = useState<SearchState>('idle');
@@ -83,12 +83,16 @@ export default function FindGasStationsDialog({ onStationSelect }: FindGasStatio
   };
 
   const handleSelect = (name: string) => {
-    onStationSelect(name);
-    setOpen(false);
-    toast({
-        title: 'Gasolinera Seleccionada',
-        description: `${name} ha sido añadida al campo de gasolinera.`,
-    })
+    if (onStationSelect) {
+        onStationSelect(name);
+        setOpen(false);
+        toast({
+            title: 'Gasolinera Seleccionada',
+            description: `${name} ha sido añadida al campo de gasolinera.`,
+        })
+    }
+    // If no onStationSelect is provided, clicking does nothing,
+    // allowing the user to just view or get directions.
   };
   
   const handleGetDirections = (e: React.MouseEvent, station: GasStationResult['stations'][0]) => {
@@ -112,16 +116,16 @@ export default function FindGasStationsDialog({ onStationSelect }: FindGasStatio
         }
     }}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon">
-          <MapPin className="h-4 w-4" />
-          <span className="sr-only">Buscar gasolineras cercanas</span>
-        </Button>
+        {children}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Buscar Gasolineras Cercanas</DialogTitle>
           <DialogDescription>
-            Selecciona una gasolinera para añadirla al registro, o haz clic en el icono de ruta para obtener direcciones.
+            {onStationSelect 
+                ? "Selecciona una gasolinera para añadirla al registro, o haz clic en el icono de ruta para obtener direcciones."
+                : "Encuentra gasolineras cerca de ti y obtén direcciones con un clic."
+            }
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4 min-h-[200px]">
@@ -160,7 +164,10 @@ export default function FindGasStationsDialog({ onStationSelect }: FindGasStatio
                     {stations.length > 0 ? stations.map((station) => (
                         <div
                             key={station.id}
-                            className="flex items-center p-3 rounded-md border hover:bg-accent cursor-pointer group"
+                            className={cn(
+                                "flex items-center p-3 rounded-md border group",
+                                onStationSelect && "cursor-pointer hover:bg-accent"
+                            )}
                             onClick={() => handleSelect(station.name)}
                         >
                             <div className="flex-1">

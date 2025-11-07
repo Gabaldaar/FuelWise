@@ -9,9 +9,10 @@ import type { EstimateFuelStopOutput } from '@/ai/flows/estimate-fuel-stop';
 import { useToast } from '@/hooks/use-toast';
 import { ai } from '@/ai/client';
 import { formatDate } from '@/lib/utils';
-import { Loader2, Wrench, Plus, Gauge } from 'lucide-react';
+import { Loader2, Wrench, Plus, Gauge, MapPin } from 'lucide-react';
 import AddServiceReminderDialog from './add-service-reminder-dialog';
 import { Button } from '../ui/button';
+import FindGasStationsDialog from './find-gas-stations-dialog';
 
 interface WelcomeBannerProps {
   vehicle: Vehicle & { averageConsumptionKmPerLiter?: number };
@@ -76,7 +77,7 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
             </div>
             )}
              <CardContent className="p-6 space-y-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center flex-wrap gap-2">
                     {vehicle && (
                       <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} vehicle={vehicle}>
                         <Button size="sm" className="w-auto">
@@ -93,6 +94,12 @@ export default function WelcomeBanner({ vehicle, lastLog }: WelcomeBannerProps) 
                         </Button>
                     </AddServiceReminderDialog>
                     )}
+                    <FindGasStationsDialog>
+                        <Button variant="secondary" size="sm" className="w-auto">
+                          <MapPin className="mr-2 h-4 w-4" />
+                          Buscar Gasolinera
+                        </Button>
+                    </FindGasStationsDialog>
                 </div>
                 <div className="flex items-center gap-4">
                     {isLoading && <Loader2 className="h-5 w-5 animate-spin" />}

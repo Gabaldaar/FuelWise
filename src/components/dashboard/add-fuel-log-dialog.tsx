@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, Plus, Loader2 } from 'lucide-react';
+import { CalendarIcon, Plus, Loader2, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -381,7 +381,12 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
                               <option key={station.id} value={station.name} />
                             ))}
                         </datalist>
-                      <FindGasStationsDialog onStationSelect={handleGasStationSelect} />
+                      <FindGasStationsDialog onStationSelect={handleGasStationSelect}>
+                        <Button type="button" variant="outline" size="icon">
+                            <MapPin className="h-4 w-4" />
+                            <span className="sr-only">Buscar gasolineras cercanas</span>
+                        </Button>
+                      </FindGasStationsDialog>
                     </div>
                     <FormMessage />
                   </FormItem>
