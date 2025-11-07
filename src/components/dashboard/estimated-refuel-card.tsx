@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Fuel, Gauge, Calendar, Sparkles } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { addDays, differenceInDays } from 'date-fns';
-import { Skeleton } from '../ui/skeleton';
 
 interface EstimatedRefuelCardProps {
   vehicle: Vehicle & { averageConsumptionKmPerLiter?: number };
@@ -14,53 +13,42 @@ interface EstimatedRefuelCardProps {
 }
 
 export default function EstimatedRefuelCard({ vehicle, allFuelLogs }: EstimatedRefuelCardProps) {
+
   const estimatedRefuel = useMemo(() => {
-    const lastLog = allFuelLogs?.[0];
+    const lastLog = allFuelLogs.length > 0 ? [...allFuelLogs].sort((a,b) => b.odometer - a.odometer)[0] : undefined;
+
     if (!lastLog || !vehicle.averageConsumptionKmPerLiter || vehicle.averageConsumptionKmPerLiter <= 0 || allFuelLogs.length < 2) {
-      return { status: 'no-data' as const };
+      return null;
     }
     
-    // Estimate current fuel level
-    let fuelSinceLastFillUp = 0;
-    let isPartialFillChain = false;
-    for (const log of allFuelLogs) {
-        if (log.isFillUp) break; 
-        fuelSinceLastFillUp += log.liters;
-        isPartialFillChain = true;
-    }
-    
-    const lastFillUpLog = allFuelLogs.find(l => l.isFillUp);
-
-    const currentFuel = isPartialFillChain 
-      ? fuelSinceLastFillUp
-      : (lastFillUpLog ? vehicle.fuelCapacityLiters - ((lastLog.odometer - lastFillUpLog.odometer) / vehicle.averageConsumptionKmPerLiter) : 0);
-
-    if (currentFuel <= 0) return { status: 'no-data' as const };
-
     // Avg km per day
-    const sortedLogs = [...allFuelLogs].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const firstLog = sortedLogs[0];
+    const sortedLogsByDate = [...allFuelLogs].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const firstLog = sortedLogsByDate[0];
     const days = differenceInDays(new Date(lastLog.date), new Date(firstLog.date));
     const totalKm = lastLog.odometer - firstLog.odometer;
     const avgKmPerDay = days > 0 ? totalKm / days : 0;
     
-    if (avgKmPerDay <= 0) return { status: 'no-data' as const };
+    if (avgKmPerDay <= 0) return null;
 
-    // Estimated next refuel (at 20% tank)
-    const kmToNextRefuel = vehicle.averageConsumptionKmPerLiter * (vehicle.fuelCapacityLiters * 0.8);
+    // Estimated next refuel (at 15% tank)
+    const fuelReserve = vehicle.fuelCapacityLiters * 0.15;
+    const lastFillUpLog = allFuelLogs.find(l => l.isFillUp);
+    const odoSinceLastFill = lastFillUpLog ? lastLog.odometer - lastFillUpLog.odometer : 0;
+    const fuelConsumedSinceFill = odoSinceLastFill / vehicle.averageConsumptionKmPerLiter;
     
-    const lastRefuelOdo = lastFillUpLog?.odometer || lastLog.odometer;
-    const kmExpected = lastRefuelOdo + kmToNextRefuel;
-    const kmRemaining = kmExpected - lastLog.odometer;
+    const currentFuel = lastFillUpLog ? vehicle.fuelCapacityLiters - fuelConsumedSinceFill : 0;
 
-    const daysToNextRefuel = kmRemaining / avgKmPerDay;
+    if (currentFuel <= fuelReserve) return null;
+
+    const kmToRefuelThreshold = (currentFuel - fuelReserve) * vehicle.averageConsumptionKmPerLiter;
+    const kmExpected = lastLog.odometer + kmToRefuelThreshold;
+
+    const daysToNextRefuel = kmToRefuelThreshold / avgKmPerDay;
     const dateExpected = addDays(new Date(), daysToNextRefuel);
 
-
     return {
-        status: 'ok' as const,
         kmExpected: Math.round(kmExpected),
-        kmRemaining: Math.round(kmRemaining),
+        kmRemaining: Math.round(kmToRefuelThreshold),
         dateExpected: formatDate(dateExpected.toISOString()),
     }
 
@@ -75,7 +63,7 @@ export default function EstimatedRefuelCard({ vehicle, allFuelLogs }: EstimatedR
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {estimatedRefuel.status === 'ok' ? (
+        {estimatedRefuel ? (
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2 text-sm">
              <div className="flex items-center gap-2">
                 <Gauge className="h-5 w-5 text-muted-foreground" />
@@ -101,7 +89,7 @@ export default function EstimatedRefuelCard({ vehicle, allFuelLogs }: EstimatedR
           </div>
         ) : (
             <div className="text-sm text-muted-foreground">
-                No hay suficientes datos para generar una estimación. Asegúrate de tener al menos dos registros de combustible.
+                No hay suficientes datos para generar una estimación. Asegúrate de tener al menos dos registros de combustible con un llenado completo entre ellos.
             </div>
         )}
       </CardContent>

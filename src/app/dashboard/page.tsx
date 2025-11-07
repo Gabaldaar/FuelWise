@@ -15,7 +15,6 @@ import { formatDate, formatCurrency } from '@/lib/utils';
 import { usePreferences } from '@/context/preferences-context';
 import { differenceInDays } from 'date-fns';
 import UrgentServicesAlert from '@/components/dashboard/urgent-services-alert';
-import EstimatedRefuelCard from '@/components/dashboard/estimated-refuel-card';
 
 function processFuelLogs(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
   // Sort logs by odometer ascending to calculate consumption correctly
@@ -90,6 +89,7 @@ export default function DashboardPage() {
   const totalLiters = useMemo(() => vehicleFuelLogs.reduce((acc, log) => acc + log.liters, 0), [vehicleFuelLogs]);
 
   const sortedPendingReminders = useMemo(() => {
+      if (!serviceReminders) return [];
       const pendingReminders: ProcessedServiceReminder[] = (serviceReminders || [])
         .filter(r => !r.isCompleted)
         .map(r => {
@@ -166,7 +166,7 @@ export default function DashboardPage() {
   }, [sortedPendingReminders]);
 
 
-  if (!vehicle) {
+  if (!vehicle || !vehicleWithAvgConsumption) {
     return <div className="text-center">Por favor, seleccione un vehículo.</div>;
   }
   
@@ -181,7 +181,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <UrgentServicesAlert reminders={urgentOrOverdueReminders} />
-      <WelcomeBanner vehicle={vehicleWithAvgConsumption as Vehicle} />
+      <WelcomeBanner vehicle={vehicleWithAvgConsumption} allFuelLogs={fuelLogsData || []} lastOdometer={lastOdometer} />
       
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Consumo Promedio" value={getFormattedConsumption(avgConsumption)} description={consumptionUnit} />
@@ -207,7 +207,6 @@ export default function DashboardPage() {
           <ServiceReminders data={sortedPendingReminders} />
       </div>
 
-      <EstimatedRefuelCard vehicle={vehicleWithAvgConsumption as Vehicle} allFuelLogs={fuelLogsData || []} />
     </div>
   );
 }
