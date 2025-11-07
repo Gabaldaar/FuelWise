@@ -21,7 +21,7 @@ import EstimatedRefuelCard from '@/components/dashboard/estimated-refuel-card';
 
 function processFuelLogs(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
   // Sort logs by odometer ascending to calculate consumption correctly
-  const sortedLogsAsc = logs.sort((a, b) => a.odometer - b.odometer);
+  const sortedLogsAsc = [...logs].sort((a, b) => a.odometer - b.odometer);
 
   const calculatedLogs = sortedLogsAsc.map((log, index) => {
     if (index === 0) return { ...log };
@@ -100,20 +100,25 @@ export default function LogsPage() {
     });
   }, [processedLogs, dateRange]);
 
-  if (!vehicle) {
+  const avgConsumption = useMemo(() => {
+    if (!vehicle || !allFuelLogs) return 0;
+    const consumptionLogs = processFuelLogs(allFuelLogs).filter(log => log.consumption && log.consumption > 0);
+    return consumptionLogs.length > 0
+      ? consumptionLogs.reduce((acc, log) => acc + (log.consumption || 0), 0) / consumptionLogs.length
+      : vehicle.averageConsumptionKmPerLiter || 0;
+  }, [allFuelLogs, vehicle]);
+
+  const vehicleWithAvgConsumption = useMemo(() => {
+    if (!vehicle) return null;
+    return { ...vehicle, averageConsumptionKmPerLiter: avgConsumption };
+  }, [vehicle, avgConsumption]);
+
+
+  if (!vehicle || !vehicleWithAvgConsumption) {
     return <div className="text-center">Por favor, seleccione un vehículo.</div>;
   }
   
   const lastLog = processedLogs?.[0]; // Already sorted desc
-  
-  const avgConsumption = useMemo(() => {
-    const consumptionLogs = processedLogs.filter(log => log.consumption && log.consumption > 0);
-    return consumptionLogs.length > 0
-      ? consumptionLogs.reduce((acc, log) => acc + (log.consumption || 0), 0) / consumptionLogs.length
-      : vehicle.averageConsumptionKmPerLiter || 0;
-  }, [processedLogs, vehicle.averageConsumptionKmPerLiter]);
-
-  const vehicleWithAvgConsumption = { ...vehicle, averageConsumptionKmPerLiter: avgConsumption };
 
   return (
     <div className="flex flex-col gap-6">

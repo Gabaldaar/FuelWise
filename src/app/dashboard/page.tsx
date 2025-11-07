@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { ProcessedFuelLog, ServiceReminder, ProcessedServiceReminder } from '@/lib/types';
+import type { ProcessedFuelLog, ServiceReminder, ProcessedServiceReminder, Vehicle } from '@/lib/types';
 import WelcomeBanner from '@/components/dashboard/welcome-banner';
 import StatCard from '@/components/dashboard/stat-card';
 import FuelConsumptionChart from '@/components/dashboard/fuel-consumption-chart';
@@ -15,6 +15,7 @@ import { formatDate, formatCurrency } from '@/lib/utils';
 import { usePreferences } from '@/context/preferences-context';
 import { differenceInDays } from 'date-fns';
 import UrgentServicesAlert from '@/components/dashboard/urgent-services-alert';
+import EstimatedRefuelCard from '@/components/dashboard/estimated-refuel-card';
 
 function processFuelLogs(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
   // Sort logs by odometer ascending to calculate consumption correctly
@@ -70,67 +71,58 @@ export default function DashboardPage() {
   const { data: fuelLogsData, isLoading: isLoadingLogs } = useCollection<ProcessedFuelLog>(fuelLogsQuery);
   const { data: serviceReminders, isLoading: isLoadingReminders } = useCollection<ServiceReminder>(remindersQuery);
   
-  const lastOdometer = fuelLogsData?.[0]?.odometer || 0;
+  const vehicleFuelLogs = useMemo(() => processFuelLogs(fuelLogsData || []), [fuelLogsData]);
+  const lastOdometer = useMemo(() => vehicleFuelLogs?.[0]?.odometer || 0, [vehicleFuelLogs]);
 
-  if (!vehicle) {
-    return <div className="text-center">Por favor, seleccione un vehículo.</div>;
-  }
-  
-  if (isLoadingLogs || isLoadingReminders) {
-    return (
-        <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-    );
-  }
-
-  const vehicleFuelLogs = processFuelLogs(fuelLogsData || []);
-  
   const avgConsumption = useMemo(() => {
     const consumptionLogs = vehicleFuelLogs.filter(log => log.consumption && log.consumption > 0);
     return consumptionLogs.length > 0 
       ? consumptionLogs.reduce((acc, log) => acc + (log.consumption || 0), 0) / consumptionLogs.length
-      : vehicle.averageConsumptionKmPerLiter || 0;
-  }, [vehicleFuelLogs, vehicle.averageConsumptionKmPerLiter]);
-
-  const vehicleWithAvgConsumption = { ...vehicle, averageConsumptionKmPerLiter: avgConsumption };
+      : vehicle?.averageConsumptionKmPerLiter || 0;
+  }, [vehicleFuelLogs, vehicle?.averageConsumptionKmPerLiter]);
   
-  const totalSpent = vehicleFuelLogs.reduce((acc, log) => acc + log.totalCost, 0);
-  const totalLiters = vehicleFuelLogs.reduce((acc, log) => acc + log.liters, 0);
+  const vehicleWithAvgConsumption = useMemo(() => {
+    if (!vehicle) return null;
+    return { ...vehicle, averageConsumptionKmPerLiter: avgConsumption };
+  }, [vehicle, avgConsumption]);
 
-  const pendingReminders: ProcessedServiceReminder[] = (serviceReminders || [])
-    .filter(r => !r.isCompleted)
-    .map(r => {
-        const kmsRemaining = r.dueOdometer ? r.dueOdometer - lastOdometer : null;
-        const daysRemaining = r.dueDate ? differenceInDays(new Date(r.dueDate), new Date()) : null;
-        
-        const isOverdue = (kmsRemaining !== null && kmsRemaining < 0) || (daysRemaining !== null && daysRemaining < 0);
-        const isUrgent = !isOverdue && (
-            (kmsRemaining !== null && kmsRemaining <= urgencyThresholdKm) || 
-            (daysRemaining !== null && daysRemaining <= urgencyThresholdDays)
-        );
+  const totalSpent = useMemo(() => vehicleFuelLogs.reduce((acc, log) => acc + log.totalCost, 0), [vehicleFuelLogs]);
+  const totalLiters = useMemo(() => vehicleFuelLogs.reduce((acc, log) => acc + log.liters, 0), [vehicleFuelLogs]);
 
-        return { ...r, kmsRemaining, daysRemaining, isOverdue, isUrgent };
+  const sortedPendingReminders = useMemo(() => {
+      const pendingReminders: ProcessedServiceReminder[] = (serviceReminders || [])
+        .filter(r => !r.isCompleted)
+        .map(r => {
+            const kmsRemaining = r.dueOdometer ? r.dueOdometer - lastOdometer : null;
+            const daysRemaining = r.dueDate ? differenceInDays(new Date(r.dueDate), new Date()) : null;
+            
+            const isOverdue = (kmsRemaining !== null && kmsRemaining < 0) || (daysRemaining !== null && daysRemaining < 0);
+            const isUrgent = !isOverdue && (
+                (kmsRemaining !== null && kmsRemaining <= urgencyThresholdKm) || 
+                (daysRemaining !== null && daysRemaining <= urgencyThresholdDays)
+            );
+
+            return { ...r, kmsRemaining, daysRemaining, isOverdue, isUrgent };
+        });
+
+    return [...pendingReminders].sort((a, b) => {
+      const aUrgency = a.dueOdometer ? a.dueOdometer - lastOdometer : Infinity;
+      const bUrgency = b.dueOdometer ? b.dueOdometer - lastOdometer : Infinity;
+
+      if (a.dueOdometer && b.dueOdometer) return aUrgency - bUrgency;
+      if (a.dueOdometer) return -1;
+      if (b.dueOdometer) return 1;
+
+      const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+      return aDate - bDate;
     });
-
-  const sortedPendingReminders = [...pendingReminders].sort((a, b) => {
-    const aUrgency = a.dueOdometer ? a.dueOdometer - lastOdometer : Infinity;
-    const bUrgency = b.dueOdometer ? b.dueOdometer - lastOdometer : Infinity;
-
-    if (a.dueOdometer && b.dueOdometer) return aUrgency - bUrgency;
-    if (a.dueOdometer) return -1; // Prioritize odometer if only one has it
-    if (b.dueOdometer) return 1;
-
-    const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-    const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-    return aDate - bDate;
-  });
+  }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays]);
   
-  const urgentOrOverdueReminders = sortedPendingReminders.filter(r => r.isOverdue || r.isUrgent);
+  const urgentOrOverdueReminders = useMemo(() => sortedPendingReminders.filter(r => r.isOverdue || r.isUrgent), [sortedPendingReminders]);
 
-  const nextService = sortedPendingReminders[0];
-
-  const getNextServiceValue = () => {
+  const nextServiceInfo = useMemo(() => {
+    const nextService = sortedPendingReminders[0];
     if (!nextService) return { value: 'N/A', description: 'Todo en orden' };
     
     let mainValue = 'Revisar';
@@ -171,14 +163,26 @@ export default function DashboardPage() {
     }
 
     return { value: mainValue, description };
-  };
+  }, [sortedPendingReminders]);
 
-  const nextServiceInfo = getNextServiceValue();
+
+  if (!vehicle) {
+    return <div className="text-center">Por favor, seleccione un vehículo.</div>;
+  }
+  
+  if (isLoadingLogs || isLoadingReminders) {
+    return (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <UrgentServicesAlert reminders={urgentOrOverdueReminders} />
-      <WelcomeBanner vehicle={vehicleWithAvgConsumption} allFuelLogs={vehicleFuelLogs} />
+      <WelcomeBanner vehicle={vehicleWithAvgConsumption as Vehicle} />
+      
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Consumo Promedio" value={getFormattedConsumption(avgConsumption)} description={consumptionUnit} />
         <StatCard title="Costo Total" value={formatCurrency(totalSpent)} />
@@ -195,13 +199,15 @@ export default function DashboardPage() {
           <FuelConsumptionChart data={vehicleFuelLogs} />
         </div>
         <div className="lg:col-span-2">
-           <RecentFuelLogs data={vehicleFuelLogs} />
+           <RecentFuelLogs data={vehicleFuelLogs.slice(0, 5)} />
         </div>
       </div>
 
        <div className="grid grid-cols-1 gap-6">
           <ServiceReminders data={sortedPendingReminders} />
       </div>
+
+      <EstimatedRefuelCard vehicle={vehicleWithAvgConsumption as Vehicle} allFuelLogs={fuelLogsData || []} />
     </div>
   );
 }

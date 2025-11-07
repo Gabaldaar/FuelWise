@@ -1,3 +1,5 @@
+'use client';
+
 import {
   Card,
   CardContent,
@@ -22,7 +24,7 @@ interface RecentFuelLogsProps {
 }
 
 export default function RecentFuelLogs({ data }: RecentFuelLogsProps) {
-  const recentLogs = [...data].reverse().slice(0, 5);
+  const recentLogs = data.slice(0, 5);
 
   return (
     <Card>
