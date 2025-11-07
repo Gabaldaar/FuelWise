@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: 'MotorLog',
   description: 'Intelligent fuel and vehicle management',
   icons: {
-    icon: '/favicon.png', // Changed from .ico to .png
+    icon: '/favicon.png?v=2',
     apple: '/apple-icon.png',
   },
 };
