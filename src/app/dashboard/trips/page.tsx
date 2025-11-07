@@ -12,8 +12,9 @@ import ActiveTrips from '@/components/trips/active-trips';
 import CompletedTrips from '@/components/trips/completed-trips';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import type { DateRange } from 'react-day-picker';
-import { subDays, startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function TripsPage() {
   const { selectedVehicle: vehicle } = useVehicles();
