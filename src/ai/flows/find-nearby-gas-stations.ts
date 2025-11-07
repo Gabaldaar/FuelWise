@@ -11,8 +11,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
 const FindNearbyGasStationsInputSchema = z.object({
-  latitude: z.number().describe('The user\'s current latitude.'),
-  longitude: z.number().describe('The user\'s current longitude.'),
+  latitude: z.number().describe("The user's current latitude."),
+  longitude: z.number().describe("The user's current longitude."),
 });
 export type FindNearbyGasStationsInput = z.infer<typeof FindNearbyGasStationsInputSchema>;
 
@@ -34,13 +34,11 @@ export async function findNearbyGasStations(input: FindNearbyGasStationsInput): 
 
 
 // This is a mock tool. In a real application, this would call an external API
-// like Google Maps Places API to get real data. We are mocking it here because
-// we don't have an API key configured.
-// It doesn't need an input schema because the LLM should decide to call it based on the prompt.
+// like Google Maps Places API to get real data.
 const getNearbyGasStationsTool = ai.defineTool(
   {
     name: 'getNearbyGasStations',
-    description: 'Get a list of gas stations near the user\'s current location.',
+    description: "Get a list of gas stations near the user's current location.",
     outputSchema: GasStationResultSchema,
   },
   async () => {
@@ -66,23 +64,10 @@ const findNearbyGasStationsFlow = ai.defineFlow(
     outputSchema: GasStationResultSchema,
   },
   async (input) => {
-    const llmResponse = await ai.generate({
-      // The prompt is a natural language question. The model will infer it needs to use the tool.
-      prompt: `Are there any gas stations near me? My current location is latitude ${input.latitude} and longitude ${input.longitude}.`,
-      tools: [getNearbyGasStationsTool],
-      model: 'googleai/gemini-2.5-flash',
-    });
-
-    const toolRequest = llmResponse.toolRequest;
-
-    if (toolRequest) {
-      const toolResponse = await toolRequest.run();
-      if (toolResponse?.output) {
-          return toolResponse.output as GasStationResult;
-      }
-    }
-    
-    // Fallback in case the tool doesn't work or the model doesn't use it.
-    return { stations: [] };
+    // In this revised, reliable implementation, we directly call the tool.
+    // The previous implementation depending on the LLM to decide to use the tool
+    // was prone to failure. This is direct and guaranteed to work for the simulation.
+    const result = await getNearbyGasStationsTool(input);
+    return result;
   }
 );
