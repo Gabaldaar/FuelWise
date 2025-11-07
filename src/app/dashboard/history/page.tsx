@@ -51,12 +51,42 @@ type TimelineHistoryItem = {
     data: ProcessedFuelLog | ProcessedServiceReminder | Trip | {};
 };
 
+// This function needs to be outside the component to be used in useMemo without causing dependency issues
+function processFuelLogsForConsumption(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
+  // Sort logs by odometer ascending to calculate consumption correctly
+  const sortedLogsAsc = [...logs].sort((a, b) => a.odometer - b.odometer);
+
+  const calculatedLogs = sortedLogsAsc.map((log, index) => {
+    if (index === 0) return { ...log };
+    
+    const prevLog = sortedLogsAsc[index - 1];
+    
+    const distanceTraveled = log.odometer - prevLog.odometer;
+    
+    if (prevLog && prevLog.isFillUp && !log.missedPreviousFillUp) {
+      const consumption = distanceTraveled > 0 && log.liters > 0 ? distanceTraveled / log.liters : 0;
+      return {
+        ...log,
+        distanceTraveled,
+        consumption: parseFloat(consumption.toFixed(2)),
+      };
+    }
+    
+    return { ...log, distanceTraveled };
+  });
+
+  // Return logs sorted descending for display (by date, which is the original query order)
+  return calculatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+
 export default function HistoryPage() {
   const { selectedVehicle: vehicle } = useVehicles();
   const { user } = useUser();
   const firestore = useFirestore();
   const { urgencyThresholdDays, urgencyThresholdKm } = usePreferences();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [avgConsumption, setAvgConsumption] = useState(vehicle?.averageConsumptionKmPerLiter || 0);
 
   const allFuelLogsQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
@@ -84,21 +114,24 @@ export default function HistoryPage() {
   const { data: allFuelLogs, isLoading: isLoadingLogs } = useCollection<ProcessedFuelLog>(allFuelLogsQuery);
   const { data: serviceReminders, isLoading: isLoadingReminders } = useCollection<ServiceReminder>(remindersQuery);
   const { data: trips, isLoading: isLoadingTrips } = useCollection<Trip>(tripsQuery);
+
+  useEffect(() => {
+    if (vehicle && allFuelLogs) {
+      const processedLogs = processFuelLogsForConsumption(allFuelLogs);
+      const consumptionLogs = processedLogs.filter(log => log.consumption && log.consumption > 0);
+      const calculatedAvg = consumptionLogs.length > 0
+        ? consumptionLogs.reduce((acc, log) => acc + (log.consumption || 0), 0) / consumptionLogs.length
+        : vehicle.averageConsumptionKmPerLiter || 0;
+      setAvgConsumption(calculatedAvg);
+    }
+  }, [allFuelLogs, vehicle]);
+
   
   const lastOdometer = useMemo(() => {
     if (!allFuelLogs || allFuelLogs.length === 0) return 0;
     // Find the log with the highest odometer reading
     return Math.max(...allFuelLogs.map(log => log.odometer));
   }, [allFuelLogs]);
-
-
-  const avgConsumption = useMemo(() => {
-    if (!allFuelLogs) return vehicle?.averageConsumptionKmPerLiter || 0;
-    const consumptionLogs = allFuelLogs.filter(log => 'consumption' in log && log.consumption && log.consumption > 0);
-    return consumptionLogs.length > 0
-      ? consumptionLogs.reduce((acc, log) => acc + (log.consumption || 0), 0) / consumptionLogs.length
-      : vehicle?.averageConsumptionKmPerLiter || 0;
-  }, [allFuelLogs, vehicle?.averageConsumptionKmPerLiter]);
 
   const vehicleWithAvgConsumption = useMemo(() => {
     if (!vehicle) return null;
@@ -557,7 +590,5 @@ function TripItemContent({ trip, vehicle, allFuelLogs }: { trip: Trip, vehicle: 
     </>
   )
 }
-
-    
 
     
