@@ -4,9 +4,10 @@ import Image from 'next/image';
 import type { Vehicle, ProcessedFuelLog } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import AddFuelLogDialog from './add-fuel-log-dialog';
-import { Wrench, Plus } from 'lucide-react';
+import { Wrench, Plus, MapPin } from 'lucide-react';
 import AddServiceReminderDialog from './add-service-reminder-dialog';
 import { Button } from '../ui/button';
+
 
 interface WelcomeBannerProps {
   vehicle: Vehicle & { averageConsumptionKmPerLiter?: number };

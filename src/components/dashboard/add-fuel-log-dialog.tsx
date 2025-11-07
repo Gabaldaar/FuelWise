@@ -219,6 +219,10 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
     setOpen(false);
   }
 
+  const handleGasStationSelect = (name: string) => {
+    setValue('gasStation', name, { shouldValidate: true });
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -368,15 +372,18 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Gasolinera</FormLabel>
-                    <FormControl>
-                        <Input 
-                            placeholder={isLoadingGasStations ? "Cargando..." : "Escribe o busca"}
-                            {...field}
-                            value={field.value ?? ''}
-                            list="gas-stations-list"
-                            disabled={isLoadingGasStations}
-                        />
-                    </FormControl>
+                     <div className="flex items-center gap-2">
+                        <FormControl>
+                            <Input 
+                                placeholder={isLoadingGasStations ? "Cargando..." : "Escribe o busca"}
+                                {...field}
+                                value={field.value ?? ''}
+                                list="gas-stations-list"
+                                disabled={isLoadingGasStations}
+                                className="flex-1"
+                            />
+                        </FormControl>
+                    </div>
                      <datalist id="gas-stations-list">
                         {gasStations?.map(station => (
                           <option key={station.id} value={station.name} />
