@@ -5,9 +5,11 @@ import Image from 'next/image';
 import type { Vehicle, ProcessedFuelLog } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import AddFuelLogDialog from './add-fuel-log-dialog';
-import { Wrench, Plus } from 'lucide-react';
+import { Wrench, Plus, Fuel, MapPin } from 'lucide-react';
 import AddServiceReminderDialog from './add-service-reminder-dialog';
 import { Button } from '../ui/button';
+import FindNearbyGasStationsDialog from '../ai/find-nearby-gas-stations-dialog';
+import { useState } from 'react';
 
 interface WelcomeBannerProps {
   vehicle: Vehicle;
@@ -16,6 +18,7 @@ interface WelcomeBannerProps {
 }
 
 export default function WelcomeBanner({ vehicle, allFuelLogs, lastOdometer }: WelcomeBannerProps) {
+  const [selectedStation, setSelectedStation] = useState('');
   
   return (
     <Card className="overflow-hidden">
@@ -38,10 +41,15 @@ export default function WelcomeBanner({ vehicle, allFuelLogs, lastOdometer }: We
                         </div>
                          <div className="flex items-center flex-wrap gap-2">
                             {vehicle && (
-                            <AddFuelLogDialog vehicleId={vehicle.id} vehicle={vehicle} lastLog={[...allFuelLogs].sort((a,b) => b.odometer - a.odometer)[0]}>
+                            <AddFuelLogDialog 
+                                vehicleId={vehicle.id} 
+                                vehicle={vehicle} 
+                                lastLog={[...allFuelLogs].sort((a,b) => b.odometer - a.odometer)[0]}
+                                fuelLog={{ gasStation: selectedStation } as any}
+                            >
                                 <Button size="sm" className="w-auto">
-                                <Plus className="-ml-1 mr-2 h-4 w-4" />
-                                Añadir Recarga
+                                <Fuel className="mr-2 h-4 w-4" />
+                                Añadir
                                 </Button>
                             </AddFuelLogDialog>
                             )}
@@ -49,10 +57,16 @@ export default function WelcomeBanner({ vehicle, allFuelLogs, lastOdometer }: We
                             <AddServiceReminderDialog vehicleId={vehicle.id} lastOdometer={lastOdometer}>
                                 <Button variant="secondary" size="sm" className="w-auto">
                                 <Wrench className="mr-2 h-4 w-4" />
-                                Añadir Recordatorio
+                                Añadir
                                 </Button>
                             </AddServiceReminderDialog>
                             )}
+                            <FindNearbyGasStationsDialog onStationSelect={setSelectedStation}>
+                                <Button variant="secondary" size="sm" className="w-auto">
+                                    <MapPin className="mr-2 h-4 w-4" />
+                                    Buscar
+                                </Button>
+                            </FindNearbyGasStationsDialog>
                         </div>
                     </div>
                 </div>
