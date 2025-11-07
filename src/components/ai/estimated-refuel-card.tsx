@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Vehicle, ProcessedFuelLog } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,7 @@ interface EstimatedRefuelCardProps {
 }
 
 export default function EstimatedRefuelCard({ vehicle, lastLog }: EstimatedRefuelCardProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [result, setResult] = useState<Awaited<ReturnType<typeof estimateFuelStop>> | null>(null);
   const [error, setError] = useState<string | null>(null);
   
@@ -23,36 +23,40 @@ export default function EstimatedRefuelCard({ vehicle, lastLog }: EstimatedRefue
     return vehicle && lastLog && vehicle.averageConsumptionKmPerLiter && vehicle.averageConsumptionKmPerLiter > 0;
   }, [vehicle, lastLog]);
 
+  useEffect(() => {
+    const getEstimation = async () => {
+      if (!canCalculate || !vehicle.averageConsumptionKmPerLiter || !lastLog) {
+        // Don't set an error, just don't show the card. The parent component handles this.
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      setError(null);
+      setResult(null);
 
-  const getEstimation = async () => {
-    if (!canCalculate || !vehicle.averageConsumptionKmPerLiter || !lastLog) {
-      setError("No hay suficientes datos para generar una estimación. Asegúrate de tener al menos un registro de combustible y un consumo promedio definido para el vehículo.");
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    setResult(null);
-
-    try {
-      const estimation = await estimateFuelStop({
-        vehicleMake: vehicle.make,
-        vehicleModel: vehicle.model,
-        vehicleYear: vehicle.year,
-        avgConsumption: vehicle.averageConsumptionKmPerLiter,
-        fuelCapacity: vehicle.fuelCapacityLiters,
-        lastOdometer: lastLog.odometer,
-        lastFuelDate: lastLog.date,
-        lastLiters: lastLog.liters,
-        isLastFillUp: lastLog.isFillUp,
-      });
-      setResult(estimation);
-    } catch (e: any) {
-      console.error("Error getting fuel stop estimation:", e);
-      setError("No se pudo generar la recomendación. Intenta de nuevo.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      try {
+        const estimation = await estimateFuelStop({
+          vehicleMake: vehicle.make,
+          vehicleModel: vehicle.model,
+          vehicleYear: vehicle.year,
+          avgConsumption: vehicle.averageConsumptionKmPerLiter,
+          fuelCapacity: vehicle.fuelCapacityLiters,
+          lastOdometer: lastLog.odometer,
+          lastFuelDate: lastLog.date,
+          lastLiters: lastLog.liters,
+          isLastFillUp: lastLog.isFillUp,
+        });
+        setResult(estimation);
+      } catch (e: any) {
+        console.error("Error getting fuel stop estimation:", e);
+        setError("No se pudo generar la recomendación.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    getEstimation();
+  }, [canCalculate, vehicle, lastLog]);
   
   const getBadgeVariant = (recommendation?: string) => {
     if (!recommendation) return "secondary";
@@ -62,15 +66,29 @@ export default function EstimatedRefuelCard({ vehicle, lastLog }: EstimatedRefue
   }
   
   if (!canCalculate) {
-    return null;
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="font-headline flex items-center gap-2"><Sparkles className="text-primary"/> Próxima Recarga</CardTitle>
+                <CardDescription>
+                Estimación inteligente de tu próxima parada para recargar.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="text-sm text-muted-foreground">
+                    No hay suficientes datos para generar una estimación. Asegúrate de tener al menos un registro de combustible y un consumo promedio para el vehículo.
+                </div>
+            </CardContent>
+        </Card>
+    );
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-headline flex items-center gap-2"><Sparkles className="text-primary"/> Asistente de Recarga</CardTitle>
+        <CardTitle className="font-headline flex items-center gap-2"><Sparkles className="text-primary"/> Próxima Recarga</CardTitle>
         <CardDescription>
-          Obtén una recomendación inteligente sobre si necesitas recargar combustible.
+          Estimación inteligente de tu próxima parada para recargar.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -84,7 +102,12 @@ export default function EstimatedRefuelCard({ vehicle, lastLog }: EstimatedRefue
                     <Skeleton className="h-10 w-24" />
                 </div>
             </div>
-        ): result ? (
+        ): error ? (
+             <div className="text-destructive text-sm flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                {error}
+            </div>
+        ) : result ? (
           <div className="space-y-3">
              <Badge variant={getBadgeVariant(result.recommendation)} className="text-base">
                 {result.recommendation}
@@ -107,20 +130,7 @@ export default function EstimatedRefuelCard({ vehicle, lastLog }: EstimatedRefue
                 </div>
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col items-start gap-4">
-            {error && (
-                <div className="text-destructive text-sm flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    {error}
-                </div>
-            )}
-            <Button onClick={getEstimation} disabled={isLoading}>
-              <Wand className="mr-2 h-4 w-4" />
-              Generar Recomendación
-            </Button>
-          </div>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );
