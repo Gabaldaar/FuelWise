@@ -70,7 +70,7 @@ const findNearbyGasStationsFlow = ai.defineFlow(
     const llmResponse = await ai.generate({
       prompt: `Find nearby gas stations for latitude ${input.latitude} and longitude ${input.longitude}.`,
       tools: [getNearbyGasStationsTool],
-      model: 'googleai/gemini-pro',
+      model: 'googleai/gemini-2.5-flash',
     });
 
     const toolResponse = llmResponse.toolRequest?.tool.output as GasStationResult;
