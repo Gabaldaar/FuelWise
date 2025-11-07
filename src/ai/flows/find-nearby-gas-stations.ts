@@ -33,26 +33,64 @@ export async function findNearbyGasStations(input: FindNearbyGasStationsInput): 
 }
 
 
-// This is a mock tool. In a real application, this would call an external API
-// like Google Maps Places API to get real data.
+// This tool now calls the Google Places API to get real data.
 const getNearbyGasStationsTool = ai.defineTool(
   {
     name: 'getNearbyGasStations',
     description: "Get a list of gas stations near the user's current location.",
+    inputSchema: FindNearbyGasStationsInputSchema,
     outputSchema: GasStationResultSchema,
   },
-  async () => {
-    // Mock data - in a real scenario, this would be an API call.
-    console.log(`Simulating API call for gas stations`);
-    return {
-        stations: [
-            { name: 'Shell Av. Libertador', address: 'Av. del Libertador 1234, CABA', distance: '1.2 km' },
-            { name: 'YPF Figueroa Alcorta', address: 'Av. Pres. Figueroa Alcorta 5678, CABA', distance: '2.5 km' },
-            { name: 'Axion Energy', address: 'Coronel Díaz 2300, CABA', distance: '3.1 km' },
-            { name: 'Puma Energy Palermo', address: 'Juan B. Justo 1500, CABA', distance: '4.0 km' },
-            { name: 'Gulf Combustibles', address: 'Av. Santa Fe 3456, CABA', distance: '4.8 km' },
-        ],
-    };
+  async ({ latitude, longitude }) => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      throw new Error('Google Maps API key is not configured. Please set GOOGLE_MAPS_API_KEY in your environment variables.');
+    }
+
+    const radius = 5000; // 5km radius
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=gas_station&key=${apiKey}`;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errorBody = await response.json();
+        console.error('Google Places API Error:', errorBody);
+        throw new Error(`Failed to fetch gas stations. Status: ${response.status}`);
+      }
+      const data = await response.json();
+
+      if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+        console.error('Google Places API Status Error:', data.error_message || data.status);
+        throw new Error(`Google Places API error: ${data.error_message || data.status}`);
+      }
+      
+      const stations = (data.results || []).map((place: any) => {
+         // This is a simplified distance calculation (Haversine formula would be more accurate)
+         // For short distances, this approximation is generally acceptable.
+        const R = 6371; // Radius of the Earth in km
+        const dLat = (place.geometry.location.lat - latitude) * (Math.PI / 180);
+        const dLon = (place.geometry.location.lng - longitude) * (Math.PI / 180);
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(latitude * (Math.PI / 180)) * Math.cos(place.geometry.location.lat * (Math.PI / 180)) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distanceKm = R * c;
+
+        return {
+          name: place.name,
+          address: place.vicinity,
+          distance: `${distanceKm.toFixed(1)} km`,
+        };
+      }).sort((a: { distance: string }, b: { distance: string }) => parseFloat(a.distance) - parseFloat(b.distance));
+
+
+      return { stations };
+
+    } catch (error) {
+      console.error('Error fetching from Google Places API:', error);
+      throw new Error('Could not retrieve gas stations from Google Places API.');
+    }
   }
 );
 
@@ -64,9 +102,7 @@ const findNearbyGasStationsFlow = ai.defineFlow(
     outputSchema: GasStationResultSchema,
   },
   async (input) => {
-    // In this revised, reliable implementation, we directly call the tool.
-    // The previous implementation depending on the LLM to decide to use the tool
-    // was prone to failure. This is direct and guaranteed to work for the simulation.
+    // Directly call the tool that now fetches real data.
     const result = await getNearbyGasStationsTool(input);
     return result;
   }
