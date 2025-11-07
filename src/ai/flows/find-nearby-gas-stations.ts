@@ -19,6 +19,7 @@ export type FindNearbyGasStationsInput = z.infer<typeof FindNearbyGasStationsInp
 const GasStationResultSchema = z.object({
   stations: z.array(
     z.object({
+      id: z.string().describe('A unique identifier for the gas station.'),
       name: z.string().describe('The name of the gas station.'),
       address: z.string().describe('The address of the gas station.'),
       distance: z.string().describe('The distance from the user in kilometers.'),
@@ -45,7 +46,8 @@ const getNearbyGasStationsTool = ai.defineTool(
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       console.error('CRITICAL: Google Maps API key is not configured.');
-      throw new Error('Google Maps API key is not configured. Please set GOOGLE_MAPS_API_KEY in your .env.local file.');
+      // This error will be shown to the user in the dialog.
+      throw new Error('La clave de API de Google Maps no está configurada en el servidor.');
     }
 
     const radius = 5000; // 5km radius
@@ -58,13 +60,13 @@ const getNearbyGasStationsTool = ai.defineTool(
       if (!response.ok) {
         console.error('Google Places API Error (Not OK):', data);
         // This makes the error more specific, pulling from Google's response if available.
-        throw new Error(`Failed to fetch gas stations. Status: ${response.status}. Message: ${data.error_message || 'No specific error message provided by API.'}`);
+        throw new Error(`Error al buscar gasolineras. Estado: ${response.status}. Mensaje: ${data.error_message || 'Error desconocido de la API.'}`);
       }
       
       // Handle API-level errors that still return a 200 OK status
       if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
         console.error('Google Places API Status Error:', data);
-        throw new Error(`Google Places API error: ${data.error_message || data.status}`);
+        throw new Error(`Error de la API de Google Places: ${data.error_message || data.status}`);
       }
       
       const stations = (data.results || []).map((place: any) => {
@@ -81,6 +83,7 @@ const getNearbyGasStationsTool = ai.defineTool(
         const distanceKm = R * c;
 
         return {
+          id: place.place_id, // Use the unique place_id
           name: place.name,
           address: place.vicinity,
           distance: `${distanceKm.toFixed(1)} km`,
@@ -91,12 +94,13 @@ const getNearbyGasStationsTool = ai.defineTool(
       return { stations };
 
     } catch (error) {
+      console.error('Error fetching from Google Places API:', error);
       // Re-throw the original error to be caught by the parent flow, ensuring it's a clear Error object.
       if (error instanceof Error) {
           throw error;
       }
       // Fallback for unexpected error types
-      throw new Error('An unexpected error occurred while retrieving gas stations from Google Places API.');
+      throw new Error('Ocurrió un error inesperado al buscar gasolineras.');
     }
   }
 );

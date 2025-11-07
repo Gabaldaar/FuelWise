@@ -53,9 +53,9 @@ export default function FindGasStationsDialog({ onStationSelect }: FindGasStatio
           });
           setStations(result.stations);
           setSearchState('success');
-        } catch (e) {
+        } catch (e: any) {
           console.error(e);
-          setError('No se pudieron encontrar gasolineras. Inténtalo de nuevo.');
+          setError(e.message || 'No se pudieron encontrar gasolineras. Inténtalo de nuevo.');
           setSearchState('error');
         }
       },
@@ -153,7 +153,7 @@ export default function FindGasStationsDialog({ onStationSelect }: FindGasStatio
                 <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
                     {stations.length > 0 ? stations.map((station) => (
                         <div
-                            key={station.name}
+                            key={station.id}
                             className="flex justify-between items-center p-3 rounded-md border hover:bg-accent cursor-pointer"
                             onClick={() => handleSelect(station.name)}
                         >
