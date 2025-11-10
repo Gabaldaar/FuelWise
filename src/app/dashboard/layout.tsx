@@ -10,7 +10,13 @@ import { useEffect } from 'react';
 import { FirebaseClientProvider } from '@/firebase';
 import { PreferencesProvider } from '@/context/preferences-context';
 import { Loader2 } from 'lucide-react';
-import ClientOnlyNotificationManager from '@/components/notifications/notification-manager';
+import dynamic from 'next/dynamic';
+
+const ClientOnlyNotificationManager = dynamic(
+  () => import('@/components/notifications/notification-manager'),
+  { ssr: false }
+);
+
 
 function DashboardLayoutContent({
   children,
