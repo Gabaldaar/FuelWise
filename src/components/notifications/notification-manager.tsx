@@ -14,18 +14,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 const NOTIFICATION_COOLDOWN_HOURS = 24;
 
 function NotificationManager() {
-  const { selectedVehicle: vehicle } = useVehicles();
+  const { selectedVehicle: vehicle, isLoading: isVehicleLoading } = useVehicles();
   const { user } = useUser();
   const firestore = useFirestore();
   const { urgencyThresholdDays, urgencyThresholdKm } = usePreferences();
 
   const [notificationPermission, setNotificationPermission] = useState('default');
   const [showPermissionCard, setShowPermissionCard] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
+  // Effect to handle initial permission state and card visibility
   useEffect(() => {
     if ('Notification' in window) {
-      setNotificationPermission(Notification.permission);
-      if (Notification.permission === 'default') {
+      const permission = Notification.permission;
+      setNotificationPermission(permission);
+      if (permission === 'default') {
         setShowPermissionCard(true);
       }
     }
@@ -52,13 +55,23 @@ function NotificationManager() {
     return query(collection(firestore, 'vehicles', vehicle.id, 'service_reminders'));
   }, [firestore, user, vehicle]);
 
-  const { data: lastFuelLogData } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
-  const { data: serviceReminders } = useCollection<ServiceReminder>(remindersQuery);
+  const { data: lastFuelLogData, isLoading: isLoadingLastLog } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
+  const { data: serviceReminders, isLoading: isLoadingReminders } = useCollection<ServiceReminder>(remindersQuery);
   
+  // Master loading state tracker
+  useEffect(() => {
+    // We are loading if the vehicle is loading, or the log/reminders are loading.
+    const loading = isVehicleLoading || isLoadingLastLog || isLoadingReminders;
+    setIsDataLoading(loading);
+  }, [isVehicleLoading, isLoadingLastLog, isLoadingReminders]);
+
+
   const lastOdometer = useMemo(() => lastFuelLogData?.[0]?.odometer || 0, [lastFuelLogData]);
 
   const processedReminders = useMemo((): ProcessedServiceReminder[] => {
-    if (!serviceReminders || !lastOdometer) return [];
+    // Do not process until all data is ready
+    if (isDataLoading || !serviceReminders || !lastOdometer) return [];
+    
     return serviceReminders
       .filter(r => !r.isCompleted)
       .map(r => {
@@ -71,10 +84,12 @@ function NotificationManager() {
         );
         return { ...r, kmsRemaining, daysRemaining, isOverdue, isUrgent };
       });
-  }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays]);
+  }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays, isDataLoading]);
 
+  // Main effect to trigger notifications. Now depends on isDataLoading.
   useEffect(() => {
-    if (notificationPermission !== 'granted' || processedReminders.length === 0 || !vehicle) {
+    // CRITICAL: Do not run if data is still loading, permission is not granted, no reminders, or no vehicle.
+    if (isDataLoading || notificationPermission !== 'granted' || processedReminders.length === 0 || !vehicle) {
       return;
     }
 
@@ -89,7 +104,7 @@ function NotificationManager() {
 
           if (shouldNotify) {
             const title = reminder.isOverdue ? 'Servicio Vencido' : 'Servicio Urgente';
-            let body = `${reminder.serviceType} para tu ${vehicle?.make} ${vehicle?.model}.`;
+            let body = `${reminder.serviceType} para tu ${vehicle.make} ${vehicle.model}.`;
             
             if (reminder.daysRemaining !== null && reminder.daysRemaining < 0) {
               body += ` Vencido hace ${Math.abs(reminder.daysRemaining)} días.`;
@@ -118,7 +133,7 @@ function NotificationManager() {
 
     checkAndNotify();
 
-  }, [processedReminders, notificationPermission, vehicle, urgencyThresholdDays, urgencyThresholdKm]);
+  }, [processedReminders, notificationPermission, vehicle, urgencyThresholdDays, urgencyThresholdKm, isDataLoading]);
 
   if (notificationPermission === 'default' && showPermissionCard) {
     return (
