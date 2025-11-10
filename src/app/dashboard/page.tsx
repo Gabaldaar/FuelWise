@@ -177,7 +177,7 @@ export default function DashboardPage() {
   }, [sortedPendingReminders]);
 
 
-  if (isVehicleLoading || !vehicleWithAvgConsumption) {
+  if (isVehicleLoading || !vehicle) {
     return (
         <div className="flex justify-center items-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -206,7 +206,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <WelcomeBanner vehicle={vehicleWithAvgConsumption} allFuelLogs={allFuelLogsData || []} lastOdometer={lastOdometer} />
+      <WelcomeBanner vehicle={vehicle} allFuelLogs={allFuelLogsData || []} lastOdometer={lastOdometer} />
       <UrgentServicesAlert reminders={urgentOrOverdueReminders} />
       
       <EstimatedRefuelCard vehicle={vehicleWithAvgConsumption} allFuelLogs={allFuelLogsData || []} />
