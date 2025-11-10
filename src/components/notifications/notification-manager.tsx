@@ -27,17 +27,21 @@ function NotificationUI({ reminders, vehicle }: NotificationUIProps) {
   useEffect(() => {
     // Este efecto se ejecuta solo en el cliente, después del montaje.
     setIsMounted(true);
-    setNotificationPermission(Notification.permission);
-    if (Notification.permission === 'default') {
-      setShowPermissionCard(true);
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermission(Notification.permission);
+      if (Notification.permission === 'default') {
+        setShowPermissionCard(true);
+      }
     }
   }, []);
 
   const handleRequestPermission = () => {
-    Notification.requestPermission().then(permission => {
-      setNotificationPermission(permission);
-      setShowPermissionCard(false);
-    });
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+        Notification.requestPermission().then(permission => {
+        setNotificationPermission(permission);
+        setShowPermissionCard(false);
+        });
+    }
   };
 
   useEffect(() => {
@@ -120,6 +124,8 @@ function NotificationManager() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { urgencyThresholdDays, urgencyThresholdKm } = usePreferences();
+  const [dataIsReadyForUI, setDataIsReadyForUI] = useState(false);
+
 
   const lastFuelLogQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
@@ -140,9 +146,16 @@ function NotificationManager() {
   
   const lastOdometer = useMemo(() => lastFuelLogData?.[0]?.odometer || 0, [lastFuelLogData]);
 
+  useEffect(() => {
+      const isReady = !isVehicleLoading && !isLoadingLastLog && !isLoadingReminders && vehicle && lastOdometer > 0;
+      if(isReady){
+        setDataIsReadyForUI(true);
+      }
+  }, [isVehicleLoading, isLoadingLastLog, isLoadingReminders, vehicle, lastOdometer]);
+
+
   const processedReminders = useMemo((): ProcessedServiceReminder[] => {
-    const dataIsReady = !isVehicleLoading && !isLoadingReminders && !!lastOdometer;
-    if (!dataIsReady || !serviceReminders) return [];
+    if (!dataIsReadyForUI || !serviceReminders) return [];
     
     return serviceReminders
       .filter(r => !r.isCompleted)
@@ -156,9 +169,7 @@ function NotificationManager() {
         );
         return { ...r, kmsRemaining, daysRemaining, isOverdue, isUrgent };
       });
-  }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays, isVehicleLoading, isLoadingReminders]);
-
-  const dataIsReadyForUI = !isVehicleLoading && !isLoadingLastLog && !isLoadingReminders && vehicle;
+  }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays, dataIsReadyForUI]);
 
   if (!dataIsReadyForUI) {
     return null;
@@ -166,7 +177,7 @@ function NotificationManager() {
 
   const urgentReminders = processedReminders.filter(r => r.isOverdue || r.isUrgent);
   
-  return <NotificationUI reminders={urgentReminders} vehicle={vehicle} />;
+  return <NotificationUI reminders={urgentReminders} vehicle={vehicle as Vehicle} />;
 }
 
 
