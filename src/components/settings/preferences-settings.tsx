@@ -7,6 +7,9 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import type { ConsumptionUnit } from '@/lib/types';
 import { Separator } from '../ui/separator';
 import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { BellRing } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function PreferencesSettings() {
   const { 
@@ -17,6 +20,24 @@ export default function PreferencesSettings() {
     urgencyThresholdKm,
     setUrgencyThresholdKm,
   } = usePreferences();
+  const { toast } = useToast();
+
+  const handleResetNotifications = () => {
+    try {
+        localStorage.removeItem('notifiedReminders');
+        toast({
+            title: 'Notificaciones Reiniciadas',
+            description: 'El sistema volverá a evaluar todos los recordatorios en la próxima carga.',
+        });
+    } catch (error) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'No se pudo reiniciar el estado de las notificaciones.',
+        });
+        console.error("Error resetting notification state:", error);
+    }
+  }
 
   return (
     <Card className="mt-4">
@@ -92,6 +113,19 @@ export default function PreferencesSettings() {
                     </p>
                 </div>
             </div>
+          </div>
+          
+          <Separator />
+
+           <div>
+            <Label className="text-base">Gestión de Notificaciones</Label>
+            <p className="text-sm text-muted-foreground mb-4">
+              Si no estás recibiendo alertas para servicios existentes, puedes forzar un reinicio.
+            </p>
+            <Button variant="outline" onClick={handleResetNotifications}>
+                <BellRing className="mr-2 h-4 w-4" />
+                Reiniciar notificaciones
+            </Button>
           </div>
         </div>
       </CardContent>
