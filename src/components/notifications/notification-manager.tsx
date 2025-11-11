@@ -26,7 +26,6 @@ function NotificationUI({ reminders, vehicle }: NotificationUIProps) {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    // This effect runs only on the client, after mount.
     setIsMounted(true);
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setNotificationPermission(Notification.permission);
@@ -38,89 +37,84 @@ function NotificationUI({ reminders, vehicle }: NotificationUIProps) {
 
   const handleRequestPermission = () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
-      console.log('[Notificaciones] Solicitando permiso...');
       Notification.requestPermission().then(permission => {
-        console.log(`[Notificaciones] Permiso: ${permission}`);
         setNotificationPermission(permission);
         setShowPermissionCard(false);
       });
     }
   };
-
-  useEffect(() => {
-    if (!isMounted) {
-      console.log('[Notificaciones] El componente UI no está montado. Esperando...');
-      return;
-    }
-    if (notificationPermission !== 'granted') {
-      console.log(`[Notificaciones] Permiso no otorgado (${notificationPermission}). Saltando lógica.`);
-      return;
-    }
-    if (reminders.length === 0) {
-      console.log('[Notificaciones] No hay recordatorios urgentes para mostrar.');
-      return;
-    }
-    if (!vehicle) {
-      console.log('[Notificaciones] Objeto de vehículo no disponible. Saltando.');
+  
+  const showNotification = async (title: string, options: NotificationOptions) => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('Notification' in window)) {
+      console.warn('[Notificaciones] El navegador no soporta notificaciones o service workers.');
       return;
     }
     
-    console.log(`[Notificaciones] Iniciando revisión de ${reminders.length} recordatorio(s) urgente(s)...`);
-
-    try {
-      const now = new Date().getTime();
-      const notifiedReminders = JSON.parse(localStorage.getItem('notifiedReminders') || '{}');
-      console.log('[Notificaciones] Recordatorios previamente notificados:', notifiedReminders);
-
-      reminders.forEach(reminder => {
-        if (reminder.isUrgent || reminder.isOverdue) {
-          const lastNotificationTime = notifiedReminders[reminder.id];
-          const shouldNotify = !lastNotificationTime || now - lastNotificationTime > NOTIFICATION_COOLDOWN_HOURS * 60 * 60 * 1000;
-          
-          console.log(`[Notificaciones] Revisando recordatorio "${reminder.serviceType}" (ID: ${reminder.id}). ¿Debería notificar? ${shouldNotify}`);
-
-          if (shouldNotify) {
-            console.log(`[Notificaciones] ¡Disparando notificación para "${reminder.serviceType}"!`);
-            const title = reminder.isOverdue ? 'Servicio Vencido' : 'Servicio Urgente';
-            let body = `${reminder.serviceType} para tu ${vehicle.make} ${vehicle.model}.`;
-            
-            if (reminder.daysRemaining !== null && reminder.daysRemaining < 0) {
-              body += ` Vencido hace ${Math.abs(reminder.daysRemaining)} días.`;
-            } else if (reminder.kmsRemaining !== null && reminder.kmsRemaining < 0) {
-              body += ` Vencido hace ${Math.abs(reminder.kmsRemaining).toLocaleString()} km.`;
-            } else if (reminder.daysRemaining !== null) {
-              body += ` Faltan ${reminder.daysRemaining} días.`;
-            } else if (reminder.kmsRemaining !== null) {
-              body += ` Faltan ${reminder.kmsRemaining.toLocaleString()} km.`;
-            }
-
-            const notification = new Notification(title, {
-              body,
-              icon: '/icon-192x192.png',
-              badge: '/icon-192x192.png',
-              tag: reminder.id,
-            });
-
-            notifiedReminders[reminder.id] = now;
-          }
-        }
-      });
-
-      localStorage.setItem('notifiedReminders', JSON.stringify(notifiedReminders));
-      console.log('[Notificaciones] Estado de notificaciones actualizado en localStorage.');
-
-    } catch (error) {
-        console.error("===== ERROR EN NOTIFICACIONES =====");
-        console.error("Se produjo un error al intentar mostrar una notificación.");
-        console.error("Error:", error);
-        console.error("Datos en el momento del error:", { reminders, vehicle });
-        console.error("===================================");
+    if (Notification.permission !== 'granted') {
+      console.warn('[Notificaciones] Permiso no otorgado.');
+      return;
     }
+    
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(title, options);
+    } catch (err) {
+      console.error("[Notificaciones] Error al mostrar vía Service Worker: ", err);
+    }
+  }
+
+  useEffect(() => {
+    if (!isMounted || notificationPermission !== 'granted' || reminders.length === 0 || !vehicle) {
+      return;
+    }
+    
+    const sendNotifications = async () => {
+        try {
+          const now = new Date().getTime();
+          const notifiedReminders = JSON.parse(localStorage.getItem('notifiedReminders') || '{}');
+
+          for (const reminder of reminders) {
+            if (reminder.isUrgent || reminder.isOverdue) {
+              const lastNotificationTime = notifiedReminders[reminder.id];
+              const shouldNotify = !lastNotificationTime || now - lastNotificationTime > NOTIFICATION_COOLDOWN_HOURS * 60 * 60 * 1000;
+
+              if (shouldNotify) {
+                const title = reminder.isOverdue ? 'Servicio Vencido' : 'Servicio Urgente';
+                let body = `${reminder.serviceType} para tu ${vehicle.make} ${vehicle.model}.`;
+
+                if (reminder.daysRemaining !== null && reminder.daysRemaining < 0) {
+                  body += ` Vencido hace ${Math.abs(reminder.daysRemaining)} días.`;
+                } else if (reminder.kmsRemaining !== null && reminder.kmsRemaining < 0) {
+                  body += ` Vencido hace ${Math.abs(reminder.kmsRemaining).toLocaleString()} km.`;
+                } else if (reminder.daysRemaining !== null) {
+                  body += ` Faltan ${reminder.daysRemaining} días.`;
+                } else if (reminder.kmsRemaining !== null) {
+                  body += ` Faltan ${reminder.kmsRemaining.toLocaleString()} km.`;
+                }
+                
+                await showNotification(title, {
+                  body,
+                  icon: '/icon-192x192.png',
+                  badge: '/icon-192x192.png',
+                  tag: reminder.id,
+                });
+
+                notifiedReminders[reminder.id] = now;
+              }
+            }
+          }
+          localStorage.setItem('notifiedReminders', JSON.stringify(notifiedReminders));
+        } catch (error) {
+            console.error("[Notificaciones] Error al procesar y enviar notificaciones:", error);
+        }
+    };
+    
+    sendNotifications();
 
   }, [reminders, vehicle, notificationPermission, isMounted]);
 
   if (!isMounted) {
-    return null; // Don't render anything until we are sure we are on the client.
+    return null;
   }
 
   if (notificationPermission === 'default' && showPermissionCard) {
@@ -149,7 +143,6 @@ function NotificationManager() {
   const { urgencyThresholdDays, urgencyThresholdKm } = usePreferences();
   const [dataIsReadyForUI, setDataIsReadyForUI] = useState(false);
 
-
   const lastFuelLogQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
     return query(
@@ -170,25 +163,19 @@ function NotificationManager() {
   const lastOdometer = useMemo(() => lastFuelLogData?.[0]?.odometer || 0, [lastFuelLogData]);
 
   useEffect(() => {
-      // This effect determines if all the necessary data is loaded and valid.
       const isReady = !isVehicleLoading && !isLoadingLastLog && !isLoadingReminders && !!vehicle && lastOdometer > 0;
       if (isReady && !dataIsReadyForUI) {
-        console.log('[Notificaciones] Todos los datos están listos. Procediendo a procesar.');
         setDataIsReadyForUI(true);
       } else if (!isReady) {
-        // This will reset if vehicle changes, etc.
         setDataIsReadyForUI(false);
       }
   }, [isVehicleLoading, isLoadingLastLog, isLoadingReminders, vehicle, lastOdometer, dataIsReadyForUI]);
 
 
   const processedReminders = useMemo((): ProcessedServiceReminder[] => {
-    // Guard clause: do not process until all data is ready.
     if (!dataIsReadyForUI || !serviceReminders || !lastOdometer) {
-       console.log('[Notificaciones] Datos no listos para procesar recordatorios.');
       return [];
     }
-    console.log(`[Notificaciones] Procesando ${serviceReminders.length} recordatorios con odómetro: ${lastOdometer}`);
     
     return serviceReminders
       .filter(r => !r.isCompleted)
@@ -204,9 +191,7 @@ function NotificationManager() {
       });
   }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays, dataIsReadyForUI]);
 
-  // Only render the UI component when data is fully ready.
   if (!dataIsReadyForUI) {
-    console.log('[Notificaciones] Manager esperando que los datos estén listos...');
     return null;
   }
 
@@ -215,8 +200,6 @@ function NotificationManager() {
   return <NotificationUI reminders={urgentReminders} vehicle={vehicle as Vehicle} />;
 }
 
-
-// We use dynamic export to ensure it only renders on the client
 const ClientOnlyNotificationManager = dynamic(() => Promise.resolve(NotificationManager), {
   ssr: false,
 });

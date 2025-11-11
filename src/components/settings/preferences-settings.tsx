@@ -9,120 +9,8 @@ import type { ConsumptionUnit } from '@/lib/types';
 import { Separator } from '../ui/separator';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { BellRing, Send } from 'lucide-react';
+import { BellRing } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, limit, orderBy } from 'firebase/firestore';
-import { useVehicles } from '@/context/vehicle-context';
-import { useEffect, useMemo, useState } from 'react';
-import type { ProcessedFuelLog, ServiceReminder, ProcessedServiceReminder } from '@/lib/types';
-import { differenceInDays } from 'date-fns';
-
-function NotificationDiagnostics() {
-  const { selectedVehicle } = useVehicles();
-  const { user } = useUser();
-  const firestore = useFirestore();
-  const { urgencyThresholdDays, urgencyThresholdKm } = usePreferences();
-  const [dataReady, setDataReady] = useState(false);
-  const [permission, setPermission] = useState('default');
-  const [urgentRemindersCount, setUrgentRemindersCount] = useState(0);
-
-  const lastFuelLogQuery = useMemoFirebase(() => {
-    if (!user || !selectedVehicle) return null;
-    return query(collection(firestore, 'vehicles', selectedVehicle.id, 'fuel_records'), orderBy('odometer', 'desc'), limit(1));
-  }, [firestore, user, selectedVehicle]);
-
-  const remindersQuery = useMemoFirebase(() => {
-    if (!user || !selectedVehicle) return null;
-    return query(collection(firestore, 'vehicles', selectedVehicle.id, 'service_reminders'));
-  }, [firestore, user, selectedVehicle]);
-
-  const { data: lastFuelLogData, isLoading: isLoadingLastLog } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
-  const { data: serviceReminders, isLoading: isLoadingReminders } = useCollection<ServiceReminder>(remindersQuery);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setPermission(Notification.permission);
-    }
-  }, []);
-
-  useEffect(() => {
-    const lastOdometer = lastFuelLogData?.[0]?.odometer || 0;
-    const allDataIsLoaded = !isLoadingReminders && !isLoadingLastLog && !!selectedVehicle && lastOdometer > 0;
-    setDataReady(allDataIsLoaded);
-
-    if (allDataIsLoaded && serviceReminders) {
-      const processed = serviceReminders
-        .filter(r => !r.isCompleted)
-        .map(r => {
-          const kmsRemaining = r.dueOdometer ? r.dueOdometer - lastOdometer : null;
-          const daysRemaining = r.dueDate ? differenceInDays(new Date(r.dueDate), new Date()) : null;
-          const isOverdue = (kmsRemaining !== null && kmsRemaining < 0) || (daysRemaining !== null && daysRemaining < 0);
-          const isUrgent = !isOverdue && ((kmsRemaining !== null && kmsRemaining <= urgencyThresholdKm) || (daysRemaining !== null && daysRemaining <= urgencyThresholdDays));
-          return { ...r, isOverdue, isUrgent };
-        });
-      setUrgentRemindersCount(processed.filter(r => r.isOverdue || r.isUrgent).length);
-    }
-  }, [isLoadingReminders, isLoadingLastLog, selectedVehicle, lastFuelLogData, serviceReminders, urgencyThresholdDays, urgencyThresholdKm]);
-
-  // Esta es la función que contiene la lógica asíncrona real.
-  const executeTestNotification = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
-        alert('Las notificaciones o Service Workers no son compatibles con este navegador.');
-        return;
-    }
-
-    let currentPermission = Notification.permission;
-    if (currentPermission === 'denied') {
-        alert('Permiso de notificaciones denegado. Debes cambiarlo en la configuración de tu navegador para este sitio.');
-        return;
-    }
-
-    if (currentPermission === 'default') {
-        currentPermission = await Notification.requestPermission();
-        setPermission(currentPermission); // Actualiza el estado visual
-        if (currentPermission !== 'granted') {
-            alert('Permiso de notificaciones no otorgado.');
-            return;
-        }
-    }
-
-    if (currentPermission === 'granted') {
-        try {
-            const registration = await navigator.serviceWorker.ready;
-            await registration.showNotification('Notificación de Prueba', {
-                body: 'Si ves esto, las notificaciones funcionan correctamente.',
-                icon: '/icon-192x192.png',
-                badge: '/icon-192x192.png'
-            });
-        } catch (err: any) {
-            console.error("Error al mostrar notificación vía Service Worker:", err);
-            alert(`Error al intentar mostrar la notificación: ${err.message}`);
-        }
-    }
-  };
-  
-  // Esta es la función síncrona que se llama desde el onClick.
-  const handleForceTestNotification = () => {
-    executeTestNotification();
-  };
-
-  return (
-    <div className="space-y-4">
-      <Label className="text-base">Diagnóstico de Notificaciones</Label>
-      <div className="p-4 border rounded-lg bg-muted/40 text-sm space-y-2">
-        <p>Estado de los datos: <span className={`font-semibold ${dataReady ? 'text-green-600' : 'text-amber-600'}`}>{dataReady ? 'Listos' : 'Cargando...'}</span></p>
-        <p>Permiso del Navegador: <span className="font-semibold">{permission}</span></p>
-        <p>Recordatorios Urgentes/Vencidos Encontrados: <span className="font-semibold">{urgentRemindersCount}</span></p>
-      </div>
-      <Button variant="secondary" onClick={handleForceTestNotification}>
-        <Send className="mr-2 h-4 w-4" />
-        Forzar Notificación de Prueba
-      </Button>
-    </div>
-  );
-}
-
 
 export default function PreferencesSettings() {
   const { 
@@ -240,11 +128,6 @@ export default function PreferencesSettings() {
                 Reiniciar notificaciones
             </Button>
           </div>
-
-          <Separator />
-
-          <NotificationDiagnostics />
-
         </div>
       </CardContent>
     </Card>
