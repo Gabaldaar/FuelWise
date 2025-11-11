@@ -65,7 +65,8 @@ function NotificationDiagnostics() {
     }
   }, [isLoadingReminders, isLoadingLastLog, selectedVehicle, lastFuelLogData, serviceReminders, urgencyThresholdDays, urgencyThresholdKm]);
 
-  const forceTestNotification = async () => {
+  // Esta es la función que contiene la lógica asíncrona real.
+  const executeTestNotification = async () => {
     if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
         alert('Las notificaciones o Service Workers no son compatibles con este navegador.');
         return;
@@ -79,7 +80,7 @@ function NotificationDiagnostics() {
 
     if (currentPermission === 'default') {
         currentPermission = await Notification.requestPermission();
-        setPermission(currentPermission);
+        setPermission(currentPermission); // Actualiza el estado visual
         if (currentPermission !== 'granted') {
             alert('Permiso de notificaciones no otorgado.');
             return;
@@ -100,7 +101,11 @@ function NotificationDiagnostics() {
         }
     }
   };
-
+  
+  // Esta es la función síncrona que se llama desde el onClick.
+  const handleForceTestNotification = () => {
+    executeTestNotification();
+  };
 
   return (
     <div className="space-y-4">
@@ -110,7 +115,7 @@ function NotificationDiagnostics() {
         <p>Permiso del Navegador: <span className="font-semibold">{permission}</span></p>
         <p>Recordatorios Urgentes/Vencidos Encontrados: <span className="font-semibold">{urgentRemindersCount}</span></p>
       </div>
-      <Button variant="secondary" onClick={forceTestNotification}>
+      <Button variant="secondary" onClick={handleForceTestNotification}>
         <Send className="mr-2 h-4 w-4" />
         Forzar Notificación de Prueba
       </Button>
