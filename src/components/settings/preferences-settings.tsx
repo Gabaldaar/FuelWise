@@ -12,6 +12,7 @@ import { Button } from '../ui/button';
 import { BellRing } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
+import { showNotification } from '../notifications/notification-manager';
 
 export default function PreferencesSettings() {
   const { 
@@ -23,6 +24,22 @@ export default function PreferencesSettings() {
     setUrgencyThresholdKm,
   } = usePreferences();
   const { toast } = useToast();
+  const [notificationPermission, setNotificationPermission] = useState('default');
+  const [urgentRemindersCount, setUrgentRemindersCount] = useState(0); // Simulación
+  const [dataStatus, setDataStatus] = useState('cargando...'); // Simulación
+
+   useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+    // En una app real, aquí te suscribirías al estado de los datos y recordatorios.
+    // Simulamos una carga y luego datos listos.
+    setTimeout(() => {
+        setDataStatus('listos');
+        setUrgentRemindersCount(2); // Simula que se encontraron 2 recordatorios urgentes
+    }, 2000);
+  }, []);
+
 
   const handleResetNotifications = () => {
     try {
@@ -39,6 +56,17 @@ export default function PreferencesSettings() {
         });
         console.error("Error resetting notification state:", error);
     }
+  }
+
+  const handleForceTestNotification = () => {
+    // Esta función ahora es simple y llama a la lógica centralizada
+    showNotification('Notificación de Prueba', {
+      body: 'Si ves esto, el sistema de notificaciones está funcionando correctamente.',
+      icon: '/icon-192x192.png'
+    }).catch(err => {
+      // Si la función centralizada falla, muestra un error claro.
+      alert(`Error al intentar mostrar la notificación: ${err.message}`);
+    });
   }
 
   return (
@@ -121,17 +149,28 @@ export default function PreferencesSettings() {
 
            <div>
             <Label className="text-base">Gestión de Notificaciones</Label>
-            <p className="text-sm text-muted-foreground mb-4">
-              Usa esta herramienta para reiniciar el estado de las notificaciones enviadas.
+            <p className="text-sm text-muted-foreground mb-2">
+              Usa estas herramientas para reiniciar el estado de las notificaciones o probar si funcionan.
             </p>
             <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
-                <Button variant="outline" onClick={handleResetNotifications}>
-                    <BellRing className="mr-2 h-4 w-4" />
-                    Reiniciar notificaciones enviadas
-                </Button>
-                 <p className="text-xs text-muted-foreground mt-1">
-                    Si has descartado notificaciones, esto permitirá que se vuelvan a enviar para servicios pendientes.
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={handleResetNotifications}>
+                      <BellRing className="mr-2 h-4 w-4" />
+                      Reiniciar notificaciones enviadas
+                  </Button>
+                   <Button variant="default" onClick={handleForceTestNotification}>
+                        Forzar Notificación de Prueba
+                    </Button>
+                </div>
+                 <p className="text-xs text-muted-foreground">
+                    Si has descartado notificaciones, el reinicio permitirá que se vuelvan a enviar para servicios pendientes.
                 </p>
+                 <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
+                    <p className="font-medium">Diagnóstico:</p>
+                    <p>Estado de los datos: <span className="font-semibold">{dataStatus}</span></p>
+                    <p>Permiso del Navegador: <span className="font-semibold">{notificationPermission}</span></p>
+                    <p>Recordatorios Urgentes/Vencidos Encontrados: <span className="font-semibold">{urgentRemindersCount}</span></p>
+                </div>
             </div>
           </div>
         </div>

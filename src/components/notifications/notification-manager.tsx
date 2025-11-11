@@ -15,6 +15,33 @@ import dynamic from 'next/dynamic';
 
 const NOTIFICATION_COOLDOWN_HOURS = 48;
 
+/**
+ * Muestra una notificación usando el Service Worker. Esta es la forma correcta para una PWA.
+ * @param title El título de la notificación.
+ * @param options El cuerpo y otras opciones de la notificación.
+ * @returns Una promesa que se resuelve cuando la notificación se muestra, o se rechaza si hay un error.
+ */
+export async function showNotification(title: string, options: NotificationOptions): Promise<void> {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('Notification' in window)) {
+      console.warn('[Notificaciones] El navegador no soporta notificaciones o service workers.');
+      return Promise.reject(new Error('Navegador no compatible.'));
+    }
+    
+    if (Notification.permission !== 'granted') {
+      console.warn('[Notificaciones] Permiso no otorgado.');
+      return Promise.reject(new Error('Permiso no otorgado.'));
+    }
+    
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(title, options);
+    } catch (err) {
+      console.error("[Notificaciones] Error al mostrar vía Service Worker: ", err);
+      throw err; // Lanza el error para que el que llama pueda manejarlo.
+    }
+}
+
+
 interface NotificationUIProps {
   reminders: ProcessedServiceReminder[];
   vehicle: Vehicle;
@@ -44,25 +71,6 @@ function NotificationUI({ reminders, vehicle }: NotificationUIProps) {
     }
   };
   
-  const showNotification = async (title: string, options: NotificationOptions) => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('Notification' in window)) {
-      console.warn('[Notificaciones] El navegador no soporta notificaciones o service workers.');
-      return;
-    }
-    
-    if (Notification.permission !== 'granted') {
-      console.warn('[Notificaciones] Permiso no otorgado.');
-      return;
-    }
-    
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      await registration.showNotification(title, options);
-    } catch (err) {
-      console.error("[Notificaciones] Error al mostrar vía Service Worker: ", err);
-    }
-  }
-
   useEffect(() => {
     if (!isMounted || notificationPermission !== 'granted' || reminders.length === 0 || !vehicle) {
       return;
@@ -105,14 +113,13 @@ function NotificationUI({ reminders, vehicle }: NotificationUIProps) {
           }
           localStorage.setItem('notifiedReminders', JSON.stringify(notifiedReminders));
         } catch (error) {
-            console.error("[Notificaciones] Error al procesar y enviar notificaciones:", error);
+            console.error("[Notificaciones] Error al procesar y enviar notificaciones automáticas:", error);
         }
     };
     
-    // Use a timeout to ensure the service worker has had time to activate
     const timer = setTimeout(() => {
         sendNotifications();
-    }, 5000); // 5-second delay
+    }, 5000); 
 
     return () => clearTimeout(timer);
 
@@ -173,7 +180,6 @@ function NotificationManager() {
       if (isReady && !dataIsReadyForUI) {
         setDataIsReadyForUI(true);
       } else if (!isReady && dataIsReadyForUI) {
-        // Reset if data becomes not ready (e.g. vehicle change)
         setDataIsReadyForUI(false);
       }
   }, [isVehicleLoading, isLoadingLastLog, isLoadingReminders, vehicle, lastOdometer, dataIsReadyForUI]);
