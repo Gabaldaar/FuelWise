@@ -1,3 +1,4 @@
+
 'use client';
 
 import { usePreferences } from '@/context/preferences-context';
@@ -69,13 +70,21 @@ function NotificationDiagnostics() {
       alert('Las notificaciones no son compatibles con este navegador.');
       return;
     }
-    if (Notification.permission === 'granted') {
+    
+    // Re-check permission right before sending
+    const currentPermission = Notification.permission;
+    setPermission(currentPermission);
+
+    if (currentPermission === 'granted') {
       new Notification('Notificación de Prueba', {
         body: 'Si ves esto, el sistema de notificaciones funciona.',
         icon: '/icon-192x192.png',
       });
-    } else {
+    } else if (currentPermission === 'denied') {
+        alert('Permiso de notificaciones denegado. Debes cambiarlo en la configuración de tu navegador.');
+    } else { // default state
       Notification.requestPermission().then(perm => {
+        setPermission(perm);
         if (perm === 'granted') {
           new Notification('¡Permiso Concedido!', {
             body: 'Ahora puedes recibir notificaciones de prueba.',
