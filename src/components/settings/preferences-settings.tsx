@@ -66,37 +66,38 @@ function NotificationDiagnostics() {
   }, [isLoadingReminders, isLoadingLastLog, selectedVehicle, lastFuelLogData, serviceReminders, urgencyThresholdDays, urgencyThresholdKm]);
 
   const forceTestNotification = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      alert('Las notificaciones no son compatibles con este navegador.');
-      return;
+    if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
+        alert('Las notificaciones o Service Workers no son compatibles con este navegador.');
+        return;
     }
 
     let currentPermission = Notification.permission;
-
     if (currentPermission === 'denied') {
-      alert('Permiso de notificaciones denegado. Debes cambiarlo en la configuración de tu navegador para este sitio.');
-      return;
+        alert('Permiso de notificaciones denegado. Debes cambiarlo en la configuración de tu navegador para este sitio.');
+        return;
     }
 
     if (currentPermission === 'default') {
-      currentPermission = await Notification.requestPermission();
-      setPermission(currentPermission); // Update state after user makes a choice
-      if (currentPermission !== 'granted') {
-        alert('Permiso de notificaciones no otorgado.');
-        return;
-      }
+        currentPermission = await Notification.requestPermission();
+        setPermission(currentPermission);
+        if (currentPermission !== 'granted') {
+            alert('Permiso de notificaciones no otorgado.');
+            return;
+        }
     }
 
-    // If we are here, permission is 'granted'.
-    try {
-      new Notification('Notificación de Prueba', {
-        body: 'Si ves esto, el sistema de notificaciones funciona.',
-        icon: '/icon-192x192.png',
-        badge: '/icon-192x192.png'
-      });
-    } catch (err: any) {
-      console.error("Error al crear notificación:", err);
-      alert(`Error al intentar mostrar la notificación: ${err.message}`);
+    if (currentPermission === 'granted') {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.showNotification('Notificación de Prueba', {
+                body: 'Si ves esto, las notificaciones funcionan correctamente.',
+                icon: '/icon-192x192.png',
+                badge: '/icon-192x192.png'
+            });
+        } catch (err: any) {
+            console.error("Error al mostrar notificación vía Service Worker:", err);
+            alert(`Error al intentar mostrar la notificación: ${err.message}`);
+        }
     }
   };
 
