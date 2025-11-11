@@ -15,33 +15,6 @@ import dynamic from 'next/dynamic';
 
 const NOTIFICATION_COOLDOWN_HOURS = 48;
 
-/**
- * Muestra una notificación usando el Service Worker. Esta es la forma correcta para una PWA.
- * @param title El título de la notificación.
- * @param options El cuerpo y otras opciones de la notificación.
- * @returns Una promesa que se resuelve cuando la notificación se muestra, o se rechaza si hay un error.
- */
-export async function showNotification(title: string, options: NotificationOptions): Promise<void> {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('Notification' in window)) {
-      console.warn('[Notificaciones] El navegador no soporta notificaciones o service workers.');
-      return Promise.reject(new Error('Navegador no compatible.'));
-    }
-    
-    if (Notification.permission !== 'granted') {
-      console.warn('[Notificaciones] Permiso no otorgado.');
-      return Promise.reject(new Error('Permiso no otorgado.'));
-    }
-    
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      await registration.showNotification(title, options);
-    } catch (err) {
-      console.error("[Notificaciones] Error al mostrar vía Service Worker: ", err);
-      throw err; // Lanza el error para que el que llama pueda manejarlo.
-    }
-}
-
-
 interface NotificationUIProps {
   reminders: ProcessedServiceReminder[];
   vehicle: Vehicle;
@@ -77,48 +50,12 @@ function NotificationUI({ reminders, vehicle }: NotificationUIProps) {
     }
     
     const sendNotifications = async () => {
-        try {
-          const now = new Date().getTime();
-          const notifiedReminders = JSON.parse(localStorage.getItem('notifiedReminders') || '{}');
-
-          for (const reminder of reminders) {
-            if (reminder.isUrgent || reminder.isOverdue) {
-              const lastNotificationTime = notifiedReminders[reminder.id];
-              const shouldNotify = !lastNotificationTime || now - lastNotificationTime > NOTIFICATION_COOLDOWN_HOURS * 60 * 60 * 1000;
-
-              if (shouldNotify) {
-                const title = reminder.isOverdue ? 'Servicio Vencido' : 'Servicio Urgente';
-                let body = `${reminder.serviceType} para tu ${vehicle.make} ${vehicle.model}.`;
-
-                if (reminder.daysRemaining !== null && reminder.daysRemaining < 0) {
-                  body += ` Vencido hace ${Math.abs(reminder.daysRemaining)} días.`;
-                } else if (reminder.kmsRemaining !== null && reminder.kmsRemaining < 0) {
-                  body += ` Vencido hace ${Math.abs(reminder.kmsRemaining).toLocaleString()} km.`;
-                } else if (reminder.daysRemaining !== null) {
-                  body += ` Faltan ${reminder.daysRemaining} días.`;
-                } else if (reminder.kmsRemaining !== null) {
-                  body += ` Faltan ${reminder.kmsRemaining.toLocaleString()} km.`;
-                }
-                
-                await showNotification(title, {
-                  body,
-                  icon: '/icon-192x192.png',
-                  badge: '/icon-192x192.png',
-                  tag: reminder.id,
-                });
-
-                notifiedReminders[reminder.id] = now;
-              }
-            }
-          }
-          localStorage.setItem('notifiedReminders', JSON.stringify(notifiedReminders));
-        } catch (error) {
-            console.error("[Notificaciones] Error al procesar y enviar notificaciones automáticas:", error);
-        }
+      // Logic for sending notifications would go here.
+      // Currently disabled due to unresolved issues.
     };
     
     const timer = setTimeout(() => {
-        sendNotifications();
+        // sendNotifications();
     }, 5000); 
 
     return () => clearTimeout(timer);
