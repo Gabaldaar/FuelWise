@@ -65,45 +65,41 @@ function NotificationDiagnostics() {
     }
   }, [isLoadingReminders, isLoadingLastLog, selectedVehicle, lastFuelLogData, serviceReminders, urgencyThresholdDays, urgencyThresholdKm]);
 
-  const showNotification = (title: string, options: NotificationOptions) => {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
-      navigator.serviceWorker.ready.then(registration => {
-        registration.showNotification(title, options);
-      }).catch(err => {
-         console.error('Service Worker not ready for notification:', err);
-         // Fallback for environments where SW might fail but notifications are supported
-         new Notification(title, options);
-      });
-    } else {
-      // Fallback for non-PWA contexts or if Service Worker isn't ready
-      new Notification(title, options);
-    }
-  };
-
-
   const forceTestNotification = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window) || !navigator.serviceWorker) {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
       alert('Las notificaciones no son compatibles con este navegador.');
       return;
     }
 
     let currentPermission = Notification.permission;
-    
-    if (currentPermission === 'default') {
-      currentPermission = await Notification.requestPermission();
-      setPermission(currentPermission);
+
+    if (currentPermission === 'denied') {
+      alert('Permiso de notificaciones denegado. Debes cambiarlo en la configuración de tu navegador para este sitio.');
+      return;
     }
 
-    if (currentPermission === 'granted') {
-      showNotification('Notificación de Prueba', {
+    if (currentPermission === 'default') {
+      currentPermission = await Notification.requestPermission();
+      setPermission(currentPermission); // Update state after user makes a choice
+      if (currentPermission !== 'granted') {
+        alert('Permiso de notificaciones no otorgado.');
+        return;
+      }
+    }
+
+    // If we are here, permission is 'granted'.
+    try {
+      new Notification('Notificación de Prueba', {
         body: 'Si ves esto, el sistema de notificaciones funciona.',
         icon: '/icon-192x192.png',
         badge: '/icon-192x192.png'
       });
-    } else if (currentPermission === 'denied') {
-      alert('Permiso de notificaciones denegado. Debes cambiarlo en la configuración de tu navegador para este sitio.');
+    } catch (err: any) {
+      console.error("Error al crear notificación:", err);
+      alert(`Error al intentar mostrar la notificación: ${err.message}`);
     }
   };
+
 
   return (
     <div className="space-y-4">
