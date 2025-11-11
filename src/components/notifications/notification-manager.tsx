@@ -109,7 +109,13 @@ function NotificationUI({ reminders, vehicle }: NotificationUIProps) {
         }
     };
     
-    sendNotifications();
+    // Use a timeout to ensure the service worker has had time to activate
+    const timer = setTimeout(() => {
+        sendNotifications();
+    }, 5000); // 5-second delay
+
+    return () => clearTimeout(timer);
+
 
   }, [reminders, vehicle, notificationPermission, isMounted]);
 

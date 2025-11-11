@@ -23,15 +23,6 @@ export default function PreferencesSettings() {
     setUrgencyThresholdKm,
   } = usePreferences();
   const { toast } = useToast();
-  const [permissionState, setPermissionState] = useState('default');
-  const [dataIsReady, setDataIsReady] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setPermissionState(Notification.permission);
-      setDataIsReady(true);
-    }
-  }, []);
 
   const handleResetNotifications = () => {
     try {
@@ -49,49 +40,6 @@ export default function PreferencesSettings() {
         console.error("Error resetting notification state:", error);
     }
   }
-
-  const handleForceTestNotification = () => {
-    console.log('[Notificaciones] Paso 1: Botón pulsado.');
-
-    if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
-        alert("Este navegador no soporta notificaciones o service workers.");
-        return;
-    }
-
-    const run = async () => {
-      try {
-        console.log('[Notificaciones] Paso 2: Solicitando permiso...');
-        const permission = await Notification.requestPermission();
-        console.log(`[Notificaciones] Paso 3: Permiso obtenido: ${permission}`);
-        setPermissionState(permission);
-
-        if (permission === 'granted') {
-            console.log('[Notificaciones] Paso 4: Esperando Service Worker...');
-            const registration = await navigator.serviceWorker.ready;
-            console.log('[Notificaciones] Paso 5: Service Worker listo.');
-
-            console.log('[Notificaciones] Paso 6: Mostrando notificación...');
-            await registration.showNotification('Notificación de Prueba', {
-                body: 'Si ves esto, ¡las notificaciones funcionan correctamente!',
-                icon: '/icon-192x192.png',
-                badge: '/icon-192x192.png',
-                tag: 'test-notification'
-            });
-            console.log('[Notificaciones] Paso 7: Notificación mostrada (o falló si no aparece).');
-        } else if (permission === 'denied') {
-            alert("Permiso de notificaciones denegado. Debes habilitarlo en la configuración de tu navegador para continuar.");
-        } else {
-            alert("El permiso de notificaciones no fue otorgado.");
-        }
-      } catch (err: any) {
-          console.error("[Notificaciones] Error en la función de prueba:", err);
-          alert(`Error al intentar mostrar la notificación: ${err.message}`);
-      }
-    };
-
-    run();
-  };
-
 
   return (
     <Card className="mt-4">
@@ -174,28 +122,16 @@ export default function PreferencesSettings() {
            <div>
             <Label className="text-base">Gestión de Notificaciones</Label>
             <p className="text-sm text-muted-foreground mb-4">
-              Usa estas herramientas para diagnosticar y gestionar las alertas.
+              Usa esta herramienta para reiniciar el estado de las notificaciones enviadas.
             </p>
             <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
-              {dataIsReady ? (
-                 <>
-                    <div className='text-sm'>
-                      <span className='font-semibold'>Permiso del Navegador:</span> <span className={`font-mono p-1 rounded text-xs ${permissionState === 'granted' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{permissionState}</span>
-                    </div>
-                    <div className='flex flex-col sm:flex-row gap-2'>
-                        <Button variant="outline" onClick={handleForceTestNotification}>
-                            <BellRing className="mr-2 h-4 w-4" />
-                            Forzar Notificación de Prueba
-                        </Button>
-                        <Button variant="outline" onClick={handleResetNotifications}>
-                            <BellRing className="mr-2 h-4 w-4" />
-                            Reiniciar notificaciones
-                        </Button>
-                    </div>
-                 </>
-              ) : (
-                <div className="text-sm text-muted-foreground">Cargando estado de notificaciones...</div>
-              )}
+                <Button variant="outline" onClick={handleResetNotifications}>
+                    <BellRing className="mr-2 h-4 w-4" />
+                    Reiniciar notificaciones enviadas
+                </Button>
+                 <p className="text-xs text-muted-foreground mt-1">
+                    Si has descartado notificaciones, esto permitirá que se vuelvan a enviar para servicios pendientes.
+                </p>
             </div>
           </div>
         </div>
