@@ -1,3 +1,4 @@
+
 'use client';
 
 import { usePreferences } from '@/context/preferences-context';
@@ -49,33 +50,46 @@ export default function PreferencesSettings() {
     }
   }
 
-  const handleForceTestNotification = async () => {
+  const handleForceTestNotification = () => {
+    console.log('[Notificaciones] Paso 1: Botón pulsado.');
+
     if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
         alert("Este navegador no soporta notificaciones o service workers.");
         return;
     }
 
-    try {
+    const run = async () => {
+      try {
+        console.log('[Notificaciones] Paso 2: Solicitando permiso...');
         const permission = await Notification.requestPermission();
+        console.log(`[Notificaciones] Paso 3: Permiso obtenido: ${permission}`);
         setPermissionState(permission);
 
         if (permission === 'granted') {
+            console.log('[Notificaciones] Paso 4: Esperando Service Worker...');
             const registration = await navigator.serviceWorker.ready;
+            console.log('[Notificaciones] Paso 5: Service Worker listo.');
+
+            console.log('[Notificaciones] Paso 6: Mostrando notificación...');
             await registration.showNotification('Notificación de Prueba', {
                 body: 'Si ves esto, ¡las notificaciones funcionan correctamente!',
                 icon: '/icon-192x192.png',
                 badge: '/icon-192x192.png',
                 tag: 'test-notification'
             });
+            console.log('[Notificaciones] Paso 7: Notificación mostrada (o falló si no aparece).');
         } else if (permission === 'denied') {
             alert("Permiso de notificaciones denegado. Debes habilitarlo en la configuración de tu navegador para continuar.");
         } else {
             alert("El permiso de notificaciones no fue otorgado.");
         }
-    } catch (err: any) {
-        console.error("Error al intentar mostrar la notificación de prueba:", err);
-        alert(`Error al intentar mostrar la notificación: ${err.message}`);
-    }
+      } catch (err: any) {
+          console.error("[Notificaciones] Error en la función de prueba:", err);
+          alert(`Error al intentar mostrar la notificación: ${err.message}`);
+      }
+    };
+
+    run();
   };
 
 
