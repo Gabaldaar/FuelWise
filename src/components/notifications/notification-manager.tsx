@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { useVehicles } from '@/context/vehicle-context';
@@ -10,13 +10,12 @@ import { differenceInDays } from 'date-fns';
 import { Button } from '../ui/button';
 import { BellRing, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import dynamic from 'next/dynamic';
 import { urlBase64ToUint8Array } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 const NOTIFICATION_COOLDOWN_HOURS = 48;
 
-async function subscribeUserToPush() {
+async function subscribeUserToPush(idToken: string) {
   if (!('serviceWorker' in navigator)) {
     throw new Error("Service Worker not supported");
   }
@@ -26,7 +25,7 @@ async function subscribeUserToPush() {
 
   if (existingSubscription) {
     console.log('[Push Manager] User is already subscribed.');
-    return existingSubscription;
+    return;
   }
 
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -40,16 +39,15 @@ async function subscribeUserToPush() {
     applicationServerKey: urlBase64ToUint8Array(publicKey),
   });
 
-  // Send the new subscription to the backend
   await fetch('/api/subscribe', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`,
     },
     body: JSON.stringify(subscription),
   });
   console.log('[Push Manager] User subscribed successfully.');
-  return subscription;
 }
 
 interface NotificationUIProps {
@@ -58,7 +56,7 @@ interface NotificationUIProps {
   onActivate: () => Promise<any>;
 }
 
-function NotificationUI({ reminders, vehicle, onActivate }: NotificationUIProps) {
+function NotificationUI({ onActivate }: NotificationUIProps) {
   const [notificationPermission, setNotificationPermission] = useState('default');
   const [showPermissionCard, setShowPermissionCard] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -96,26 +94,23 @@ function NotificationUI({ reminders, vehicle, onActivate }: NotificationUIProps)
             })
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error subscribing to push notifications:', error);
         toast({
             variant: 'destructive',
             title: 'Error de Suscripción',
-            description: 'No se pudieron activar las notificaciones.'
+            description: error.message || 'No se pudieron activar las notificaciones.'
         })
     } finally {
         setIsSubscribing(false);
     }
   };
 
-  if (!isMounted) {
+  if (!isMounted || !showPermissionCard) {
     return null;
   }
 
-  // TODO: Add logic to send notifications to backend API to be triggered.
-
-  if (notificationPermission === 'default' && showPermissionCard) {
-    return (
+  return (
       <div className="fixed bottom-4 right-4 z-50 w-full max-w-sm">
         <Card>
           <CardHeader>
@@ -130,10 +125,7 @@ function NotificationUI({ reminders, vehicle, onActivate }: NotificationUIProps)
           </CardContent>
         </Card>
       </div>
-    );
-  }
-
-  return null;
+  );
 }
 
 function NotificationManager() {
@@ -141,11 +133,17 @@ function NotificationManager() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { urgencyThresholdDays, urgencyThresholdKm } = usePreferences();
-  const [dataIsReadyForUI, setDataIsReadyForUI] = useState(false);
 
   useEffect(() => {
-    if ('serviceWorker' in navigator && window.serwist) {
-        window.serwist.register();
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(
+        (registration) => {
+          console.log('Service Worker registration successful with scope: ', registration.scope);
+        },
+        (err) => {
+          console.log('Service Worker registration failed: ', err);
+        }
+      );
     }
   }, []);
 
@@ -168,18 +166,8 @@ function NotificationManager() {
   
   const lastOdometer = useMemo(() => lastFuelLogData?.[0]?.odometer || 0, [lastFuelLogData]);
 
-  useEffect(() => {
-      const isReady = !isVehicleLoading && !isLoadingLastLog && !isLoadingReminders && !!vehicle;
-      if (isReady && !dataIsReadyForUI) {
-        setDataIsReadyForUI(true);
-      } else if (!isReady && dataIsReadyForUI) {
-        setDataIsReadyForUI(false);
-      }
-  }, [isVehicleLoading, isLoadingLastLog, isLoadingReminders, vehicle, dataIsReadyForUI]);
-
-
-  const processedReminders = useMemo((): ProcessedServiceReminder[] => {
-    if (!dataIsReadyForUI || !serviceReminders || !lastOdometer) {
+  const urgentReminders = useMemo((): ProcessedServiceReminder[] => {
+    if (isVehicleLoading || isLoadingLastLog || isLoadingReminders || !serviceReminders || !lastOdometer) {
       return [];
     }
     
@@ -194,20 +182,59 @@ function NotificationManager() {
           (daysRemaining !== null && daysRemaining <= urgencyThresholdDays)
         );
         return { ...r, kmsRemaining, daysRemaining, isOverdue, isUrgent };
+      }).filter(r => r.isOverdue || r.isUrgent);
+  }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays, isVehicleLoading, isLoadingLastLog, isLoadingReminders]);
+
+  const handleActivation = useCallback(async () => {
+    if (!user) throw new Error("Usuario no autenticado");
+    const idToken = await user.getIdToken();
+    await subscribeUserToPush(idToken);
+  }, [user]);
+
+  // Effect to trigger notifications
+  useEffect(() => {
+    if (!user || urgentReminders.length === 0) {
+      return;
+    }
+
+    const lastNotificationTimes = JSON.parse(localStorage.getItem('lastNotificationTimes') || '{}');
+    const now = new Date().getTime();
+
+    const remindersToNotify = urgentReminders.filter(reminder => {
+      const lastTime = lastNotificationTimes[reminder.id];
+      if (!lastTime) return true; // Never notified
+      const hoursSinceLast = (now - lastTime) / (1000 * 60 * 60);
+      return hoursSinceLast > NOTIFICATION_COOLDOWN_HOURS;
+    });
+
+    if (remindersToNotify.length > 0) {
+      console.log(`[Notifier] Found ${remindersToNotify.length} reminders to notify about.`);
+      const payload = {
+        title: `Alerta de Mantenimiento para ${vehicle?.make} ${vehicle?.model}`,
+        body: `Tienes ${remindersToNotify.length} servicio(s) que requieren tu atención.`,
+        icon: vehicle?.imageUrl || '/icon-192x192.png'
+      };
+
+      fetch('/api/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, payload }),
+      }).then(() => {
+        // Update notification times on success
+        remindersToNotify.forEach(reminder => {
+          lastNotificationTimes[reminder.id] = now;
+        });
+        localStorage.setItem('lastNotificationTimes', JSON.stringify(lastNotificationTimes));
+        console.log('[Notifier] Notification request sent to backend.');
+      }).catch(err => {
+        console.error('[Notifier] Failed to send notification request:', err);
       });
-  }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays, dataIsReadyForUI]);
+    }
 
-  if (!dataIsReadyForUI) {
-    return null;
-  }
+  }, [urgentReminders, user, vehicle]);
 
-  const urgentReminders = processedReminders.filter(r => r.isOverdue || r.isUrgent);
   
-  return <NotificationUI reminders={urgentReminders} vehicle={vehicle as Vehicle} onActivate={subscribeUserToPush} />;
+  return <NotificationUI onActivate={handleActivation} reminders={urgentReminders} vehicle={vehicle as Vehicle} />;
 }
 
-const ClientOnlyNotificationManager = dynamic(() => Promise.resolve(NotificationManager), {
-  ssr: false,
-});
-
-export default ClientOnlyNotificationManager;
+export default NotificationManager;
