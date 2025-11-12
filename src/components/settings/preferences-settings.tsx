@@ -88,30 +88,36 @@ export default function PreferencesSettings() {
   }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays, dataIsReady]);
 
   const handleForceTestNotification = async () => {
-    if (!user || !vehicle) {
+    if (!user) {
         toast({ variant: 'destructive', title: 'Error', description: 'Selecciona un vehículo e inicia sesión.'});
         return;
     }
-    if (urgentReminders.length === 0) {
-        toast({ title: 'Nada que notificar', description: 'No se encontraron servicios urgentes o vencidos en este momento.'});
-        return;
-    }
-
+    
     setIsSending(true);
     try {
-        const results = await sendUrgentRemindersNotification(user.uid, urgentReminders, vehicle, notificationCooldownHours, true);
+        const payload = {
+            title: 'Notificación de Prueba',
+            body: 'Este es el cuerpo del mensaje de prueba.',
+            icon: vehicle?.imageUrl || '/icon-192x192.png'
+        };
+
+        const res = await fetch('/api/send-push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.uid, payload }),
+        });
         
-        if (!Array.isArray(results)) {
-          throw new Error("La respuesta del servidor no fue la esperada.");
+        if (!res.ok) {
+           const errorData = await res.json();
+           throw new Error(errorData.error || 'Falló la respuesta del servidor');
         }
 
-        const sentCount = results.reduce((acc, r) => acc + (r.sent || 0), 0);
-        const expiredCount = results.reduce((acc, r) => acc + (r.expired || 0), 0);
-
-        if (sentCount > 0 || expiredCount > 0) {
+        const result = await res.json();
+        
+        if (result.sent > 0 || result.expired > 0) {
             toast({ 
                 title: 'Respuesta del Servidor', 
-                description: `Enviados: ${sentCount}, Suscripciones Expiradas/Eliminadas: ${expiredCount}.`
+                description: `Enviados: ${result.sent}, Suscripciones Expiradas/Eliminadas: ${result.expired}.`
             });
         } else {
              toast({ title: 'Nada para enviar', description: 'No se encontraron suscripciones activas para enviar notificaciones.'});
@@ -237,7 +243,7 @@ export default function PreferencesSettings() {
             <div className="flex gap-2 mt-4">
                 <Button onClick={handleForceTestNotification} variant="outline" disabled={isSending}>
                     {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Forzar Envío de Notificaciones
+                    Enviar Notificación de Prueba
                 </Button>
             </div>
           </div>
