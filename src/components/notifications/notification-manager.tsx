@@ -139,7 +139,7 @@ function NotificationManager() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { urgencyThresholdDays, urgencyThresholdKm, notificationCooldownHours } = usePreferences();
-  // State to trigger re-evaluation
+  
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -153,11 +153,10 @@ function NotificationManager() {
         }
       );
     }
-     // Set up a timer to periodically re-check for notifications
     const interval = setInterval(() => {
       console.log('[Notifier] Periodic check triggered.');
       setTick(prev => prev + 1);
-    }, 15 * 60 * 1000); // Every 15 minutes
+    }, 15 * 60 * 1000); 
 
     return () => clearInterval(interval);
   }, []);
@@ -198,7 +197,7 @@ function NotificationManager() {
         );
         return { ...r, kmsRemaining, daysRemaining, isOverdue, isUrgent };
       }).filter(r => r.isOverdue || r.isUrgent);
-  }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays, isVehicleLoading, isLoadingLastLog, isLoadingReminders, tick]); // Add tick to dependencies
+  }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays, isVehicleLoading, isLoadingLastLog, isLoadingReminders]);
 
   const handleActivation = useCallback(async () => {
     if (!user) throw new Error("Usuario no autenticado");
@@ -206,9 +205,15 @@ function NotificationManager() {
     await subscribeUserToPush(idToken);
   }, [user]);
 
-  // Effect to trigger notifications
+  // Effect to trigger notifications. Now depends on 'tick' to force re-evaluation.
   useEffect(() => {
+    // We add the 'tick' dependency here. This whole effect will re-run every 15 mins.
+    console.log(`[Notifier] Evaluating notifications. Tick: ${tick}`);
+
     if (!user || urgentReminders.length === 0 || typeof window === 'undefined' || Notification.permission !== 'granted') {
+      if (urgentReminders.length > 0) {
+        console.log(`[Notifier] Skipping: User=${!!user}, Reminders=${urgentReminders.length}, Permission=${Notification.permission}`);
+      }
       return;
     }
 
@@ -219,7 +224,7 @@ function NotificationManager() {
       const lastTime = lastNotificationTimes[reminder.id];
       if (!lastTime) {
         console.log(`[Notifier] Reminder ${reminder.serviceType} has no last notification time. It's a candidate.`);
-        return true; // Never notified
+        return true; 
       }
       const hoursSinceLast = (now - lastTime) / (1000 * 60 * 60);
        if (hoursSinceLast > notificationCooldownHours) {
@@ -244,7 +249,6 @@ function NotificationManager() {
         body: JSON.stringify({ userId: user.uid, payload }),
       }).then((res) => {
         if(res.ok) {
-            // Update notification times on success
             remindersToNotify.forEach(reminder => {
                 lastNotificationTimes[reminder.id] = now;
             });
@@ -260,7 +264,7 @@ function NotificationManager() {
         console.log('[Notifier] No new reminders to notify about at this time.');
     }
 
-  }, [urgentReminders, user, vehicle, notificationCooldownHours]);
+  }, [urgentReminders, user, vehicle, notificationCooldownHours, tick]); // Added 'tick' dependency
 
   
   return <NotificationUI onActivate={handleActivation} reminders={urgentReminders} vehicle={vehicle as Vehicle} />;
