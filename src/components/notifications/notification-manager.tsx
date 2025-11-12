@@ -13,15 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { urlBase64ToUint8Array } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-export async function showNotification(title: string, options: NotificationOptions) {
-  if (!('serviceWorker' in navigator)) {
-    throw new Error("Service Worker not supported");
-  }
-  const registration = await navigator.serviceWorker.ready;
-  await registration.showNotification(title, options);
-}
-
-async function subscribeUserToPush(idToken: string) {
+export async function subscribeUserToPush(idToken: string) {
   if (!('serviceWorker' in navigator)) {
     throw new Error("Service Worker not supported");
   }
@@ -31,6 +23,12 @@ async function subscribeUserToPush(idToken: string) {
 
   if (existingSubscription) {
     console.log('[Push Manager] User is already subscribed.');
+    // Even if subscribed, we might want to re-sync with backend
+    await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify(existingSubscription),
+    });
     return;
   }
 
@@ -47,18 +45,66 @@ async function subscribeUserToPush(idToken: string) {
 
   await fetch('/api/subscribe', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${idToken}`,
-    },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
     body: JSON.stringify(subscription),
   });
   console.log('[Push Manager] User subscribed successfully.');
 }
 
+// Export this function so it can be used by the settings page
+export async function sendUrgentRemindersNotification(userId: string, reminders: ProcessedServiceReminder[], vehicle: Vehicle | null, cooldownHours: number) {
+    if (reminders.length === 0 || typeof window === 'undefined' || Notification.permission !== 'granted') {
+      if (reminders.length > 0) {
+        console.log(`[Notifier] Skipping: Reminders=${reminders.length}, Permission=${Notification.permission}`);
+      }
+      return { sent: 0, skipped: reminders.length };
+    }
+
+    const lastNotificationTimes = JSON.parse(localStorage.getItem('lastNotificationTimes') || '{}');
+    const now = new Date().getTime();
+    let sentCount = 0;
+
+    const remindersToNotify = reminders.filter(reminder => {
+      const lastTime = lastNotificationTimes[reminder.id];
+      if (!lastTime) {
+        return true; 
+      }
+      const hoursSinceLast = (now - lastTime) / (1000 * 60 * 60);
+      return hoursSinceLast > cooldownHours;
+    });
+
+    if (remindersToNotify.length > 0) {
+      console.log(`[Notifier] Found ${remindersToNotify.length} reminders to notify about.`, remindersToNotify.map(r => r.serviceType));
+      const payload = {
+        title: `Alerta de Mantenimiento para ${vehicle?.make} ${vehicle?.model}`,
+        body: `Tienes ${remindersToNotify.length} servicio(s) que requieren tu atención.`,
+        icon: vehicle?.imageUrl || '/icon-192x192.png'
+      };
+
+      const res = await fetch('/api/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, payload }),
+      });
+
+      if(res.ok) {
+          remindersToNotify.forEach(reminder => {
+              lastNotificationTimes[reminder.id] = now;
+          });
+          localStorage.setItem('lastNotificationTimes', JSON.stringify(lastNotificationTimes));
+          sentCount = remindersToNotify.length;
+          console.log('[Notifier] Notification request sent and localStorage updated.');
+      } else {
+          console.error('[Notifier] Backend failed to send notification.', res.statusText);
+      }
+    } else {
+        console.log('[Notifier] No new reminders to notify about at this time (all are within cooldown period).');
+    }
+    return { sent: sentCount, skipped: reminders.length - sentCount };
+}
+
+
 interface NotificationUIProps {
-  reminders: ProcessedServiceReminder[];
-  vehicle: Vehicle;
   onActivate: () => Promise<any>;
 }
 
@@ -112,7 +158,7 @@ function NotificationUI({ onActivate }: NotificationUIProps) {
     }
   };
 
-  if (!isMounted || !showPermissionCard) {
+  if (!isMounted || !showPermissionCard || notificationPermission === 'granted') {
     return null;
   }
 
@@ -205,69 +251,15 @@ function NotificationManager() {
     await subscribeUserToPush(idToken);
   }, [user]);
 
-  // Effect to trigger notifications. Now depends on 'tick' to force re-evaluation.
   useEffect(() => {
-    // We add the 'tick' dependency here. This whole effect will re-run every 15 mins.
-    console.log(`[Notifier] Evaluating notifications. Tick: ${tick}`);
-
-    if (!user || urgentReminders.length === 0 || typeof window === 'undefined' || Notification.permission !== 'granted') {
-      if (urgentReminders.length > 0) {
-        console.log(`[Notifier] Skipping: User=${!!user}, Reminders=${urgentReminders.length}, Permission=${Notification.permission}`);
-      }
-      return;
+    const runCheck = async () => {
+        if (!user || !vehicle) return;
+        await sendUrgentRemindersNotification(user.uid, urgentReminders, vehicle, notificationCooldownHours);
     }
-
-    const lastNotificationTimes = JSON.parse(localStorage.getItem('lastNotificationTimes') || '{}');
-    const now = new Date().getTime();
-
-    const remindersToNotify = urgentReminders.filter(reminder => {
-      const lastTime = lastNotificationTimes[reminder.id];
-      if (!lastTime) {
-        console.log(`[Notifier] Reminder ${reminder.serviceType} has no last notification time. It's a candidate.`);
-        return true; 
-      }
-      const hoursSinceLast = (now - lastTime) / (1000 * 60 * 60);
-       if (hoursSinceLast > notificationCooldownHours) {
-        console.log(`[Notifier] Reminder ${reminder.serviceType} was last notified ${hoursSinceLast.toFixed(1)} hours ago. It's a candidate.`);
-        return true;
-      }
-      console.log(`[Notifier] Reminder ${reminder.serviceType} was notified recently. Skipping.`);
-      return false;
-    });
-
-    if (remindersToNotify.length > 0) {
-      console.log(`[Notifier] Found ${remindersToNotify.length} reminders to notify about.`, remindersToNotify.map(r => r.serviceType));
-      const payload = {
-        title: `Alerta de Mantenimiento para ${vehicle?.make} ${vehicle?.model}`,
-        body: `Tienes ${remindersToNotify.length} servicio(s) que requieren tu atención.`,
-        icon: vehicle?.imageUrl || '/icon-192x192.png'
-      };
-
-      fetch('/api/send-push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, payload }),
-      }).then((res) => {
-        if(res.ok) {
-            remindersToNotify.forEach(reminder => {
-                lastNotificationTimes[reminder.id] = now;
-            });
-            localStorage.setItem('lastNotificationTimes', JSON.stringify(lastNotificationTimes));
-            console.log('[Notifier] Notification request sent to backend and localStorage updated.');
-        } else {
-            console.error('[Notifier] Backend failed to send notification.', res.statusText);
-        }
-      }).catch(err => {
-        console.error('[Notifier] Failed to send notification request:', err);
-      });
-    } else {
-        console.log('[Notifier] No new reminders to notify about at this time.');
-    }
-
-  }, [urgentReminders, user, vehicle, notificationCooldownHours, tick]); // Added 'tick' dependency
-
+    runCheck();
+  }, [tick, user, vehicle, urgentReminders, notificationCooldownHours]);
   
-  return <NotificationUI onActivate={handleActivation} reminders={urgentReminders} vehicle={vehicle as Vehicle} />;
+  return <NotificationUI onActivate={handleActivation} />;
 }
 
 export default NotificationManager;

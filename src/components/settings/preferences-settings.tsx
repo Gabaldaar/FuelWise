@@ -5,7 +5,7 @@ import { usePreferences } from '@/context/preferences-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import type { ConsumptionUnit, ProcessedServiceReminder } from '@/lib/types';
+import type { ConsumptionUnit, ProcessedServiceReminder, ServiceReminder, Vehicle } from '@/lib/types';
 import { Separator } from '../ui/separator';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -14,6 +14,9 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { useVehicles } from '@/context/vehicle-context';
 import { collection, query, limit, orderBy } from 'firebase/firestore';
 import { differenceInDays } from 'date-fns';
+import { sendUrgentRemindersNotification } from '../notifications/notification-manager';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 
 export default function PreferencesSettings() {
@@ -31,9 +34,11 @@ export default function PreferencesSettings() {
   const { selectedVehicle: vehicle, isLoading: isVehicleLoading } = useVehicles();
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const [notificationPermission, setNotificationPermission] = useState('default');
   const [dataIsReady, setDataIsReady] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -56,7 +61,7 @@ export default function PreferencesSettings() {
   }, [firestore, user, vehicle]);
 
   const { data: lastFuelLogData, isLoading: isLoadingLastLog } = useCollection(lastFuelLogQuery);
-  const { data: serviceReminders, isLoading: isLoadingReminders } = useCollection(remindersQuery);
+  const { data: serviceReminders, isLoading: isLoadingReminders } = useCollection<ServiceReminder>(remindersQuery);
   
   const lastOdometer = useMemo(() => lastFuelLogData?.[0]?.odometer || 0, [lastFuelLogData]);
 
@@ -64,12 +69,12 @@ export default function PreferencesSettings() {
       setDataIsReady(!isVehicleLoading && !isLoadingLastLog && !isLoadingReminders && !!vehicle);
   }, [isVehicleLoading, isLoadingLastLog, isLoadingReminders, vehicle]);
 
-  const urgentRemindersCount = useMemo(() => {
-    if (!dataIsReady || !serviceReminders || lastOdometer <= 0) return 0;
+  const urgentReminders: ProcessedServiceReminder[] = useMemo(() => {
+    if (!dataIsReady || !serviceReminders || lastOdometer <= 0) return [];
     
     return serviceReminders
       .filter(r => !r.isCompleted)
-      .filter(r => {
+      .map(r => {
         const kmsRemaining = r.dueOdometer ? r.dueOdometer - lastOdometer : null;
         const daysRemaining = r.dueDate ? differenceInDays(new Date(r.dueDate), new Date()) : null;
         const isOverdue = (kmsRemaining !== null && kmsRemaining < 0) || (daysRemaining !== null && daysRemaining < 0);
@@ -77,37 +82,32 @@ export default function PreferencesSettings() {
           (kmsRemaining !== null && kmsRemaining <= urgencyThresholdKm) ||
           (daysRemaining !== null && daysRemaining <= urgencyThresholdDays)
         );
-        return isOverdue || isUrgent;
-      }).length;
+        return { ...r, kmsRemaining, daysRemaining, isOverdue, isUrgent };
+      })
+      .filter(r => r.isOverdue || r.isUrgent);
   }, [serviceReminders, lastOdometer, urgencyThresholdKm, urgencyThresholdDays, dataIsReady]);
 
   const handleForceTestNotification = async () => {
-    console.log('Paso 1: Botón pulsado');
+    if (!user || !vehicle) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Selecciona un vehículo e inicia sesión.'});
+        return;
+    }
+
+    setIsSending(true);
     try {
-      console.log('Paso 2: Solicitando permiso...');
-      const permission = await Notification.requestPermission();
-      console.log(`Paso 3: Permiso obtenido: ${permission}`);
-      setNotificationPermission(permission);
-
-      if (permission === 'granted') {
-        console.log('Paso 4: Esperando Service Worker...');
-        const registration = await navigator.serviceWorker.ready;
-        console.log('Paso 5: Service Worker listo.', registration);
-        
-        console.log('Paso 6: Mostrando notificación...');
-        await registration.showNotification('Notificación de Prueba', {
-          body: 'Si ves esto, ¡las notificaciones funcionan!',
-          icon: '/icon-192x192.png',
-        });
-        console.log('Paso 7: Notificación mostrada (o falló en segundo plano).');
-        alert('Se ha enviado la orden para mostrar la notificación. Si no aparece, revisa los permisos de notificación de tu sistema operativo o la consola del navegador en un PC.');
-
-      } else {
-        alert('El permiso para mostrar notificaciones fue denegado.');
-      }
+        const result = await sendUrgentRemindersNotification(user.uid, urgentReminders, vehicle, notificationCooldownHours);
+        if (result.sent > 0) {
+            toast({ title: 'Notificaciones Enviadas', description: `Se envió una solicitud para ${result.sent} notificación(es).`});
+        } else if (result.skipped > 0 && urgentReminders.length > 0) {
+            toast({ title: 'No se enviaron notificaciones', description: 'Los recordatorios urgentes ya fueron notificados recientemente.'});
+        } else {
+             toast({ title: 'Nada que notificar', description: 'No se encontraron servicios urgentes o vencidos en este momento.'});
+        }
     } catch (error: any) {
-      console.error('Error al intentar mostrar la notificación:', error);
-      alert(`Error al intentar mostrar la notificación: ${error.message}`);
+        console.error('Error al forzar notificación:', error);
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+        setIsSending(false);
     }
   };
 
@@ -219,11 +219,12 @@ export default function PreferencesSettings() {
              <div className="text-sm space-y-1 mt-2 p-3 border rounded-md bg-muted/50">
                 <p><strong>Estado de los datos:</strong> {dataIsReady ? 'listos' : 'cargando...'}</p>
                 <p><strong>Permiso del Navegador:</strong> {notificationPermission}</p>
-                <p><strong>Recordatorios Urgentes/Vencidos Encontrados:</strong> {urgentRemindersCount}</p>
+                <p><strong>Recordatorios Urgentes/Vencidos Encontrados:</strong> {urgentReminders.length}</p>
             </div>
             <div className="flex gap-2 mt-4">
-                <Button onClick={handleForceTestNotification} variant="outline">
-                    Forzar Notificación de Prueba
+                <Button onClick={handleForceTestNotification} variant="outline" disabled={isSending}>
+                    {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Forzar Envío de Notificaciones
                 </Button>
             </div>
           </div>
