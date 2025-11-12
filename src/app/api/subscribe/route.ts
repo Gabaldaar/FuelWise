@@ -1,7 +1,7 @@
 'use server';
 
 import { NextResponse } from 'next/server';
-import admin from '@/firebase/admin';
+import admin from '@/firebase/admin'; // Import the centralized admin instance
 
 // Use the initialized admin instance. Do not initialize here.
 const db = admin.firestore();
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     // Verify the token using the Admin SDK
     decodedToken = await admin.auth().verifyIdToken(idToken);
   } catch (error) {
-    console.error('Error verifying token:', error);
+    console.error('Error verifying ID token:', error);
     return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
   }
   
@@ -47,10 +47,10 @@ export async function POST(request: Request) {
         createdAt: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true }); // Use merge: true to create or update
     
-    console.log(`Successfully saved/updated subscription for user: ${userId}`);
+    console.log(`Successfully saved/updated subscription for user: ${userId} with docId: ${docId}`);
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Error saving subscription:', error);
+    console.error('Error saving subscription to Firestore:', error);
     return NextResponse.json({ error: 'Failed to save subscription', details: error.message }, { status: 500 });
   }
 }
