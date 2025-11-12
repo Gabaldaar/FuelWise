@@ -71,8 +71,8 @@ export async function POST(request: Request) {
       const sub = doc.data().subscription as PushSubscription;
       promises.push(
         webpush.sendNotification(sub, notificationPayload).catch(error => {
-          if (error.statusCode === 410) {
-            // GCM error 410 means the subscription is no longer valid
+          if (error.statusCode === 410 || error.statusCode === 404) { // 410: GCM, 404: Web Push Protocol
+            // Subscription is no longer valid
             expiredSubscriptions.push(doc.id);
           } else {
             console.error('Failed to send notification to one subscription:', error);
