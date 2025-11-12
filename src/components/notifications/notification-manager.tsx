@@ -63,12 +63,12 @@ export async function sendUrgentRemindersNotification(
       if (reminders.length > 0) {
         console.log(`[Notifier] Skipping: Reminders=${reminders.length}, Permission=${Notification.permission}`);
       }
-      return { sent: 0, skipped: reminders.length };
+      return [];
     }
 
     const lastNotificationTimes = JSON.parse(localStorage.getItem('lastNotificationTimes') || '{}');
     const now = new Date().getTime();
-    let sentCount = 0;
+    const apiResults = [];
 
     const remindersToNotify = reminders.filter(reminder => {
       if (ignoreCooldown) {
@@ -92,19 +92,26 @@ export async function sendUrgentRemindersNotification(
                 icon: vehicle?.imageUrl || '/icon-192x192.png'
             };
 
-            const res = await fetch('/api/send-push', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, payload }),
-            });
+            try {
+                const res = await fetch('/api/send-push', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, payload }),
+                });
 
-            if (res.ok) {
-                sentCount++;
-                if (!ignoreCooldown) {
-                    lastNotificationTimes[reminder.id] = now;
+                if (res.ok) {
+                    const data = await res.json();
+                    apiResults.push(data);
+                    if (data.sent > 0 && !ignoreCooldown) {
+                        lastNotificationTimes[reminder.id] = now;
+                    }
+                } else {
+                    console.error(`[Notifier] Backend failed to send notification for ${reminder.serviceType}.`, res.statusText);
+                    apiResults.push({ error: `Failed for ${reminder.serviceType}: ${res.statusText}` });
                 }
-            } else {
-                 console.error(`[Notifier] Backend failed to send notification for ${reminder.serviceType}.`, res.statusText);
+            } catch (error) {
+                console.error(`[Notifier] Network error sending notification for ${reminder.serviceType}.`, error);
+                apiResults.push({ error: `Network error for ${reminder.serviceType}` });
             }
         }
         
@@ -115,7 +122,7 @@ export async function sendUrgentRemindersNotification(
     } else {
         console.log('[Notifier] No new reminders to notify about at this time (all are within cooldown period).');
     }
-    return { sent: sentCount, skipped: reminders.length - sentCount };
+    return apiResults;
 }
 
 
@@ -282,3 +289,5 @@ function NotificationManager() {
 }
 
 export default NotificationManager;
+
+    
