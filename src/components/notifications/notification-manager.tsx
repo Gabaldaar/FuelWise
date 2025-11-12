@@ -13,6 +13,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { urlBase64ToUint8Array } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
+// --- SERVICE WORKER REGISTRATION ---
+/**
+ * Registers the service worker.
+ * @returns {Promise<ServiceWorkerRegistration | undefined>}
+ */
+async function registerServiceWorker(): Promise<ServiceWorkerRegistration | undefined> {
+  if (!('serviceWorker' in navigator)) {
+    console.error("Service Worker not supported");
+    return undefined;
+  }
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js');
+    console.log('Service Worker registration successful with scope: ', registration.scope);
+    return registration;
+  } catch (err) {
+    console.error('Service Worker registration failed: ', err);
+    return undefined;
+  }
+}
+
+
 export async function subscribeUserToPush(idToken: string) {
   if (!('serviceWorker' in navigator)) {
     throw new Error("Service Worker not supported");
@@ -63,6 +84,8 @@ export async function sendUrgentRemindersNotification(
   cooldownHours: number,
   ignoreCooldown = false // New parameter
 ): Promise<any[]> {
+    const apiResults = [];
+
     if (reminders.length === 0 || typeof window === 'undefined' || Notification.permission !== 'granted') {
       if (reminders.length > 0) {
         console.log(`[Notifier] Skipping: Reminders=${reminders.length}, Permission=${Notification.permission}`);
@@ -72,8 +95,7 @@ export async function sendUrgentRemindersNotification(
 
     const lastNotificationTimes = JSON.parse(localStorage.getItem('lastNotificationTimes') || '{}');
     const now = new Date().getTime();
-    const apiResults = [];
-
+    
     const remindersToNotify = reminders.filter(reminder => {
       if (ignoreCooldown) {
         return true; // Ignore cooldown for forced send
@@ -89,6 +111,15 @@ export async function sendUrgentRemindersNotification(
     if (remindersToNotify.length > 0) {
         console.log(`[Notifier] Found ${remindersToNotify.length} reminders to notify about.`, remindersToNotify.map(r => r.serviceType));
         
+        // This part now needs to get the subscription object to send to the backend
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+
+        if (!subscription) {
+            console.error('[Notifier] Could not get push subscription to send notifications.');
+            return [{ error: 'Could not get push subscription.' }];
+        }
+        
         for (const reminder of remindersToNotify) {
             const payload = {
                 title: `${reminder.isOverdue ? 'Servicio Vencido' : 'Servicio Urgente'}: ${vehicle?.make}`,
@@ -100,18 +131,19 @@ export async function sendUrgentRemindersNotification(
                 const res = await fetch('/api/send-push', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, payload }),
+                    body: JSON.stringify({ subscription, payload }),
                 });
 
                 if (res.ok) {
                     const data = await res.json();
                     apiResults.push(data);
-                    if (data.sent > 0 && !ignoreCooldown) {
+                    if (data.success && !ignoreCooldown) {
                         lastNotificationTimes[reminder.id] = now;
                     }
                 } else {
-                    console.error(`[Notifier] Backend failed to send notification for ${reminder.serviceType}.`, res.statusText);
-                    apiResults.push({ error: `Failed for ${reminder.serviceType}: ${res.statusText}` });
+                    const errorData = await res.json();
+                    console.error(`[Notifier] Backend failed to send notification for ${reminder.serviceType}.`, errorData);
+                    apiResults.push({ error: `Failed for ${reminder.serviceType}: ${errorData.error}` });
                 }
             } catch (error) {
                 console.error(`[Notifier] Network error sending notification for ${reminder.serviceType}.`, error);
@@ -215,16 +247,9 @@ function NotificationManager() {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    if ('serviceWorker' in navigator && !navigator.serviceWorker.controller) {
-      navigator.serviceWorker.register('/sw.js').then(
-        (registration) => {
-          console.log('Service Worker registration successful with scope: ', registration.scope);
-        },
-        (err) => {
-          console.log('Service Worker registration failed: ', err);
-        }
-      );
-    }
+    // Register the service worker as soon as the component mounts
+    registerServiceWorker();
+
     const interval = setInterval(() => {
       console.log('[Notifier] Periodic check triggered.');
       setTick(prev => prev + 1);
