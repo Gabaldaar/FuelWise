@@ -52,7 +52,13 @@ export async function subscribeUserToPush(idToken: string) {
 }
 
 // Export this function so it can be used by the settings page
-export async function sendUrgentRemindersNotification(userId: string, reminders: ProcessedServiceReminder[], vehicle: Vehicle | null, cooldownHours: number) {
+export async function sendUrgentRemindersNotification(
+  userId: string, 
+  reminders: ProcessedServiceReminder[], 
+  vehicle: Vehicle | null, 
+  cooldownHours: number,
+  ignoreCooldown = false // New parameter
+) {
     if (reminders.length === 0 || typeof window === 'undefined' || Notification.permission !== 'granted') {
       if (reminders.length > 0) {
         console.log(`[Notifier] Skipping: Reminders=${reminders.length}, Permission=${Notification.permission}`);
@@ -65,6 +71,9 @@ export async function sendUrgentRemindersNotification(userId: string, reminders:
     let sentCount = 0;
 
     const remindersToNotify = reminders.filter(reminder => {
+      if (ignoreCooldown) {
+        return true; // Ignore cooldown for forced send
+      }
       const lastTime = lastNotificationTimes[reminder.id];
       if (!lastTime) {
         return true; 
@@ -88,12 +97,17 @@ export async function sendUrgentRemindersNotification(userId: string, reminders:
       });
 
       if(res.ok) {
-          remindersToNotify.forEach(reminder => {
-              lastNotificationTimes[reminder.id] = now;
-          });
-          localStorage.setItem('lastNotificationTimes', JSON.stringify(lastNotificationTimes));
+          // Only update timestamp if we are NOT ignoring cooldown
+          if (!ignoreCooldown) {
+            remindersToNotify.forEach(reminder => {
+                lastNotificationTimes[reminder.id] = now;
+            });
+            localStorage.setItem('lastNotificationTimes', JSON.stringify(lastNotificationTimes));
+            console.log('[Notifier] Notification request sent and localStorage updated.');
+          } else {
+            console.log('[Notifier] Forced notification request sent. Cooldown localStorage not updated.');
+          }
           sentCount = remindersToNotify.length;
-          console.log('[Notifier] Notification request sent and localStorage updated.');
       } else {
           console.error('[Notifier] Backend failed to send notification.', res.statusText);
       }
@@ -189,7 +203,7 @@ function NotificationManager() {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator && !navigator.serviceWorker.controller) {
       navigator.serviceWorker.register('/sw.js').then(
         (registration) => {
           console.log('Service Worker registration successful with scope: ', registration.scope);
@@ -253,11 +267,15 @@ function NotificationManager() {
 
   useEffect(() => {
     const runCheck = async () => {
-        if (!user || !vehicle) return;
+        if (!user || !vehicle || urgentReminders.length === 0) return;
+        console.log('[Notifier] Running periodic check...');
         await sendUrgentRemindersNotification(user.uid, urgentReminders, vehicle, notificationCooldownHours);
     }
-    runCheck();
-  }, [tick, user, vehicle, urgentReminders, notificationCooldownHours]);
+    // Only run on initial load and on timer ticks
+    if (tick > 0 || (lastOdometer > 0 && serviceReminders)) {
+        runCheck();
+    }
+  }, [tick, user, vehicle, urgentReminders, notificationCooldownHours, lastOdometer, serviceReminders]);
   
   return <NotificationUI onActivate={handleActivation} />;
 }

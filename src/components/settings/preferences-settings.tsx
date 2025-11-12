@@ -95,11 +95,11 @@ export default function PreferencesSettings() {
 
     setIsSending(true);
     try {
-        const result = await sendUrgentRemindersNotification(user.uid, urgentReminders, vehicle, notificationCooldownHours);
+        const result = await sendUrgentRemindersNotification(user.uid, urgentReminders, vehicle, notificationCooldownHours, true); // ignoreCooldown = true
         if (result.sent > 0) {
             toast({ title: 'Notificaciones Enviadas', description: `Se envió una solicitud para ${result.sent} notificación(es).`});
         } else if (result.skipped > 0 && urgentReminders.length > 0) {
-            toast({ title: 'No se enviaron notificaciones', description: 'Los recordatorios urgentes ya fueron notificados recientemente.'});
+            toast({ title: 'No se enviaron notificaciones', description: 'Los recordatorios urgentes ya fueron notificados recientemente (cooldown activo), pero se forzó el envío de prueba.'});
         } else {
              toast({ title: 'Nada que notificar', description: 'No se encontraron servicios urgentes o vencidos en este momento.'});
         }
