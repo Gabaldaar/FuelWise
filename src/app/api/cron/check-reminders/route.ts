@@ -1,6 +1,6 @@
 'use server';
 
-import { NextResponse } from 'next/server';
+import type { Handler } from '@netlify/functions';
 import admin from '@/firebase/admin';
 import type { ServiceReminder, Vehicle } from '@/lib/types';
 import webpush, { type PushSubscription } from 'web-push';
@@ -112,9 +112,10 @@ async function checkAndSendForVehicle(vehicle: Vehicle) {
     return notificationsSent;
 }
 
-
 // The main function for the scheduled endpoint
-export async function GET(request: Request) {
+export const handler: Handler = async () => {
+  console.log('[Netlify Function] - checkReminders: Cron job triggered.');
+
   // --- START VAPID CONFIG ---
   // Moved inside the handler to run at request time, not build time.
   if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -127,14 +128,20 @@ export async function GET(request: Request) {
       }
   } else {
      console.error("[Cron] VAPID keys are not set. Cannot send push notifications.");
-     return NextResponse.json({ error: 'Server is not configured for push.' }, { status: 500 });
+     return {
+        statusCode: 500,
+        body: 'VAPID keys are not set on the server.'
+     }
   }
   // --- END VAPID CONFIG ---
 
   try {
     const vehiclesSnap = await db.collection('vehicles').get();
     if (vehiclesSnap.empty) {
-      return NextResponse.json({ success: true, message: 'No vehicles to check.' });
+      return {
+          statusCode: 200,
+          body: 'No vehicles to check.'
+      }
     }
 
     let totalNotificationsSent = 0;
@@ -150,10 +157,18 @@ export async function GET(request: Request) {
     allSubscriptionsCache.subs = [];
     allSubscriptionsCache.timestamp = null;
 
-    return NextResponse.json({ success: true, message: `Cron job completed. Sent notifications for ${totalNotificationsSent} reminders.` });
+    const successMessage = `Cron job completed. Sent notifications for ${totalNotificationsSent} reminders.`;
+    console.log(`[Netlify Function] - checkReminders: ${successMessage}`);
+    return {
+        statusCode: 200,
+        body: successMessage
+    };
 
   } catch (error: any) {
-    console.error('Error in cron job:', error);
-    return NextResponse.json({ success: false, error: 'Internal server error', details: error.message }, { status: 500 });
+    console.error('[Netlify Function] - checkReminders: Error during execution:', error);
+    return {
+        statusCode: 500,
+        body: `Internal server error: ${error.message}`
+    };
   }
 }
