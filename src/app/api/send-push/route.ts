@@ -7,7 +7,6 @@ import type { PushSubscription } from 'web-push';
 
 export async function POST(request: Request) {
   // --- START VAPID CONFIG ---
-  // Moved inside the handler to run at request time, not build time.
   if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
     webpush.setVapidDetails(
       'mailto:your-email@example.com',
