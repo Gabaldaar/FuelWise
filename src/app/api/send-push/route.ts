@@ -4,21 +4,23 @@ import { NextResponse } from 'next/server';
 import webpush from 'web-push';
 import type { PushSubscription } from 'web-push';
 
-// --- START INITIALIZATION BLOCK ---
-// Configure web-push with VAPID keys. This should only run once.
-if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    'mailto:your-email@example.com', // Replace with a valid email
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
-} else {
-  // This log will appear when the server starts if keys are missing.
-  console.error('VAPID keys are missing. Push notifications will fail. Please set NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables.');
-}
-// --- END INITIALIZATION BLOCK ---
 
 export async function POST(request: Request) {
+  // --- START VAPID CONFIG ---
+  // Moved inside the handler to run at request time, not build time.
+  if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    if (!webpush.getVapidDetails()) {
+        webpush.setVapidDetails(
+          'mailto:your-email@example.com',
+          process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+          process.env.VAPID_PRIVATE_KEY
+        );
+    }
+  } else {
+      console.error('VAPID keys are missing. Push notifications will fail.');
+  }
+  // --- END VAPID CONFIG ---
+
   try {
     // 1. Validate VAPID keys are set before proceeding
     if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {

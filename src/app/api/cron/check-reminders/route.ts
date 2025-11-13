@@ -1,4 +1,3 @@
-// /api/cron/check-reminders/route.ts
 'use server';
 
 import { NextResponse } from 'next/server';
@@ -7,24 +6,7 @@ import type { ServiceReminder, Vehicle } from '@/lib/types';
 import webpush, { type PushSubscription } from 'web-push';
 import { differenceInDays, differenceInHours } from 'date-fns';
 
-// This is a scheduled function, intended to be called by Netlify's scheduler.
-// It will iterate through ALL vehicles and check for notifications.
-
 const db = admin.firestore();
-
-// --- START VAPID CONFIG (Ensure it's configured once) ---
-if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && !webpush.getVapidDetails()) {
-  try {
-    webpush.setVapidDetails(
-      'mailto:your-email@example.com',
-      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-      process.env.VAPID_PRIVATE_KEY
-    );
-  } catch (error) {
-     console.error("VAPID details already set, skipping.", error);
-  }
-}
-// --- END VAPID CONFIG ---
 
 // In-memory caches to avoid redundant DB reads during a single run
 const vehicleOdometerCache = new Map<string, number>();
@@ -133,16 +115,21 @@ async function checkAndSendForVehicle(vehicle: Vehicle) {
 
 // The main function for the scheduled endpoint
 export async function GET(request: Request) {
-  // Optional: Add a secret to prevent unauthorized calls
-  // const secret = request.headers.get('x-cron-secret');
-  // if (secret !== process.env.CRON_SECRET) {
-  //   return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  // }
-  
-   if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+  // --- START VAPID CONFIG ---
+  // Moved inside the handler to run at request time, not build time.
+  if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+      if (!webpush.getVapidDetails()) {
+        webpush.setVapidDetails(
+            'mailto:your-email@example.com',
+            process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+            process.env.VAPID_PRIVATE_KEY
+        );
+      }
+  } else {
      console.error("[Cron] VAPID keys are not set. Cannot send push notifications.");
      return NextResponse.json({ error: 'Server is not configured for push.' }, { status: 500 });
-   }
+  }
+  // --- END VAPID CONFIG ---
 
   try {
     const vehiclesSnap = await db.collection('vehicles').get();
