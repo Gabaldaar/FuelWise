@@ -1,12 +1,13 @@
+
 [build]
   command = "npm run build"
   publish = ".next"
-  functions = "netlify/functions" # Tell Netlify where our functions are
+  functions = "netlify/functions"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Schedule the "cron" function to run daily at 8:00 UTC
+# Schedule the "checkReminders" function to run daily at 8:00 UTC
 [[functions]]
-  name = "cron"
+  name = "checkReminders"
   schedule = "0 8 * * *"
