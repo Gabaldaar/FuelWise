@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 
 
 // This function will be called from other components to trigger the check
+// This function is now obsolete as the cron job handles everything.
+// It is kept here as a reference but it's not used anymore.
 export const triggerRemindersCheck = async (vehicleId: string) => {
   if (!vehicleId) {
     console.error("Vehicle ID is required to check reminders.");
@@ -19,20 +21,11 @@ export const triggerRemindersCheck = async (vehicleId: string) => {
   console.log(`Triggering reminder check for vehicle: ${vehicleId}`);
   
   try {
-    const response = await fetch('/api/check-and-send-reminders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vehicleId }),
-    });
+    // This endpoint no longer exists as logic was moved to a serverless function.
+    // To avoid errors, this function now does nothing.
+    console.log("Reminder check is now handled automatically by the scheduled Netlify function.");
+    return { success: true, message: "Automatic check is in place."};
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to trigger reminder check.");
-    }
-
-    const result = await response.json();
-    console.log("Reminder check API response:", result);
-    return result;
   } catch (error: any) {
     console.error("Error triggering reminder check:", error.message);
   }
@@ -194,5 +187,3 @@ export default function NotificationManager() {
 
   return <NotificationUI />;
 }
-
-    
