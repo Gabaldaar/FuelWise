@@ -31,8 +31,8 @@ export default function RootLayout({
           <FirebaseClientProvider>
             <PwaSetup />
             {children}
+            <Toaster />
           </FirebaseClientProvider>
-          <Toaster />
       </body>
     </html>
   );

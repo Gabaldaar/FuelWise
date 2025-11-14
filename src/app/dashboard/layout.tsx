@@ -7,7 +7,6 @@ import { VehicleProvider } from '@/context/vehicle-context';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { FirebaseClientProvider } from '@/firebase';
 import { PreferencesProvider } from '@/context/preferences-context';
 import { Loader2, WifiOff } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -29,7 +28,7 @@ function OfflineWarning({ isOnline }: { isOnline: boolean }) {
     );
 }
 
-function DashboardLayoutContent({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -39,28 +38,24 @@ function DashboardLayoutContent({
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, isUserLoading, router]);
-
-  useEffect(() => {
-    // Definir el estado inicial
     if (typeof navigator !== 'undefined') {
         setIsOnline(navigator.onLine);
     }
-
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     return () => {
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
 
   if (isUserLoading || !user) {
     return (
@@ -93,18 +88,5 @@ function DashboardLayoutContent({
         </SidebarProvider>
       </PreferencesProvider>
     </VehicleProvider>
-  );
-}
-
-
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <FirebaseClientProvider>
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
-    </FirebaseClientProvider>
   );
 }
