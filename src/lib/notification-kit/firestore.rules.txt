@@ -1,0 +1,22 @@
+// firestore.rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Reglas para tu aplicación existente...
+    // ...
+
+    // NUEVA REGLA: Colección de suscripciones
+    // Permite a los usuarios crear/actualizar su propia suscripción,
+    // pero solo pueden leer o eliminar la suya.
+    match /subscriptions/{subscriptionId} {
+      allow read, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+  }
+}
