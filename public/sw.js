@@ -1,40 +1,71 @@
-// This is a basic service worker for handling push notifications.
 
-self.addEventListener('push', event => {
-  if (!event.data) {
-    console.error('Push event but no data');
-    return;
-  }
-  const data = event.data.json();
+const CACHE_NAME = 'motorlog-cache-v1';
+// Lista de recursos esenciales para la "carcasa" de la aplicación.
+const urlsToCache = [
+  '/',
+  '/manifest.json',
+  // Agrega aquí los íconos y otros assets estáticos cruciales
+];
 
-  const title = data.title || 'MotorLog';
-  const options = {
-    body: data.body,
-    icon: data.icon || '/icon-192x192.png',
-    badge: '/icon-96x96.png', // Badge for the notification bar
-    vibrate: [200, 100, 200], // Vibration pattern
-    tag: 'motorlog-notification', // Group notifications
-    renotify: true, // Allow replacing old notifications
-  };
-
+// 1. Instalación del Service Worker: Cachear la carcasa de la aplicación.
+self.addEventListener('install', event => {
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('Cache abierto');
+        return cache.addAll(urlsToCache);
+      })
   );
 });
 
-self.addEventListener('notificationclick', event => {
-  event.notification.close(); // Close the notification
-
-  // Focus the app if it's already open, or open it if it's not.
+// 2. Activación del Service Worker: Limpiar cachés antiguas.
+self.addEventListener('activate', event => {
+  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then(clientsArr => {
-      const hadWindowToFocus = clientsArr.some(windowClient =>
-        windowClient.url.includes(self.location.origin) ? (windowClient.focus(), true) : false
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Borrando caché antigua:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
       );
-
-      if (!hadWindowToFocus) {
-        clients.openWindow(self.location.origin).then(windowClient => windowClient ? windowClient.focus() : null);
-      }
     })
+  );
+});
+
+// 3. Interceptación de Peticiones (Fetch)
+self.addEventListener('fetch', event => {
+  const { request } = event;
+
+  // No interceptar peticiones de la API de Firestore
+  if (request.url.includes('firestore.googleapis.com')) {
+    return;
+  }
+  
+  // Estrategia "Network First" para la navegación y otros recursos.
+  event.respondWith(
+    fetch(request)
+      .then(response => {
+        // Si la petición a la red es exitosa, la usamos y la guardamos en caché.
+        if (response && response.status === 200) {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME)
+            .then(cache => {
+              cache.put(request, responseToCache);
+            });
+        }
+        return response;
+      })
+      .catch(() => {
+        // Si la red falla (estamos offline), intentamos servir desde la caché.
+        return caches.match(request).then(response => {
+          if (response) {
+            return response;
+          }
+          // Opcional: Podrías devolver una página offline personalizada aquí si no se encuentra en caché.
+        });
+      })
   );
 });
