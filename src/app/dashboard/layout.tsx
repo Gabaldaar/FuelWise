@@ -6,10 +6,10 @@ import { Sidebar, SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { VehicleProvider } from '@/context/vehicle-context';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { FirebaseClientProvider } from '@/firebase';
 import { PreferencesProvider } from '@/context/preferences-context';
-import { Loader2 } from 'lucide-react';
+import { Loader2, WifiOff } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const ClientOnlyNotificationManager = dynamic(
@@ -17,6 +17,17 @@ const ClientOnlyNotificationManager = dynamic(
   { ssr: false }
 );
 
+function OfflineWarning({ isOnline }: { isOnline: boolean }) {
+    if (isOnline) {
+        return null;
+    }
+    return (
+        <div className="bg-yellow-500 text-black text-center p-2 text-sm font-semibold flex items-center justify-center gap-2">
+            <WifiOff className="h-4 w-4" />
+            <span>Estás trabajando sin conexión. Algunos datos pueden no estar actualizados.</span>
+        </div>
+    );
+}
 
 function DashboardLayoutContent({
   children,
@@ -25,12 +36,31 @@ function DashboardLayoutContent({
 }) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
+
+  useEffect(() => {
+    // Definir el estado inicial
+    if (typeof navigator !== 'undefined') {
+        setIsOnline(navigator.onLine);
+    }
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   if (isUserLoading || !user) {
     return (
@@ -54,6 +84,7 @@ function DashboardLayoutContent({
             </Sidebar>
             <SidebarInset>
             <AppHeader />
+            <OfflineWarning isOnline={isOnline} />
             <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-background">
                 {children}
             </main>
