@@ -61,7 +61,7 @@ async function checkAndSendForVehicle(vehicle: Vehicle) {
     // These should come from a global config, but hardcoded for now.
     const URGENCY_THRESHOLD_KM = 1000;
     const URGENCY_THRESHOLD_DAYS = 15;
-    const NOTIFICATION_COOLDOWN_HOURS = 48;
+    const NOTIFICATION_COOLDOWN_HOURS = 1;
 
     for (const reminder of pendingReminders) {
         const kmsRemaining = reminder.dueOdometer ? reminder.dueOdometer - lastOdometer : null;
@@ -84,10 +84,21 @@ async function checkAndSendForVehicle(vehicle: Vehicle) {
             let body = `${reminder.serviceType} - `;
             body += isOverdue ? '¡Servicio Vencido!' : '¡Servicio Próximo!';
             
-            const payload = JSON.stringify({ title, body, icon: vehicle.imageUrl || '/icon-192x192.png' });
-
+            const payload = JSON.stringify({ 
+                title, 
+                body, 
+                icon: vehicle.imageUrl || '/icon-192x192.png',
+                tag: reminder.id // Use reminder ID as a unique tag
+            });
+            
+            let reminderSentToAtLeastOneDevice = false;
             const sendPromises = subscriptions.map(subscription => 
-                webpush.sendNotification(subscription, payload).catch(error => {
+                webpush.sendNotification(subscription, payload)
+                .then(() => {
+                    notificationsSent++; // Increment for each successful send
+                    reminderSentToAtLeastOneDevice = true;
+                })
+                .catch(error => {
                      if (error.statusCode === 410) { // GONE, subscription is no longer valid
                         console.log('[Cron] Subscription expired. Deleting from DB...');
                         db.collection('subscriptions').where('subscription.endpoint', '==', subscription.endpoint).limit(1).get()
@@ -101,12 +112,12 @@ async function checkAndSendForVehicle(vehicle: Vehicle) {
             );
             
             await Promise.all(sendPromises);
-            notificationsSent++;
 
-            // Update timestamp on the reminder
-            await db.collection('vehicles').doc(vehicle.id).collection('service_reminders').doc(reminder.id).update({
-                lastNotificationSent: new Date().toISOString()
-            });
+            if (reminderSentToAtLeastOneDevice) {
+                await db.collection('vehicles').doc(vehicle.id).collection('service_reminders').doc(reminder.id).update({
+                    lastNotificationSent: new Date().toISOString()
+                });
+            }
         }
     }
     return notificationsSent;
@@ -157,7 +168,7 @@ export const handler: Handler = async () => {
     allSubscriptionsCache.subs = [];
     allSubscriptionsCache.timestamp = null;
 
-    const successMessage = `Cron job completed. Sent notifications for ${totalNotificationsSent} reminders.`;
+    const successMessage = `Cron job completed. Sent ${totalNotificationsSent} total notifications.`;
     console.log(`[Netlify Function] - checkReminders: ${successMessage}`);
     return {
         statusCode: 200,
