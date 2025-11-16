@@ -13,7 +13,7 @@ interface ReportStatCardProps {
 export function ReportStatCard({ icon: Icon, title, value, description, variant = 'default' }: ReportStatCardProps) {
   const isSmall = variant === 'small';
   return (
-    <Card className={cn(isSmall && 'shadow-none border-0')}>
+    <Card className={cn(isSmall ? 'shadow-none border-0 p-0' : '')}>
       <CardHeader className={cn("flex flex-row items-center justify-between pb-2", isSmall ? 'p-2' : 'p-6')}>
         <CardTitle className={cn("font-medium text-muted-foreground", isSmall ? 'text-sm' : 'text-base')}>
           {title}
