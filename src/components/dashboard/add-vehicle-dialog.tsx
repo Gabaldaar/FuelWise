@@ -6,9 +6,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Loader2, Car, CalendarIcon } from 'lucide-react';
+import { Plus, Loader2, Car } from 'lucide-react';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -36,9 +35,6 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { doc, collection, query, orderBy } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Calendar } from '../ui/calendar';
-import { cn } from '@/lib/utils';
 import { Separator } from '../ui/separator';
 
 const formSchema = z.object({
@@ -54,7 +50,7 @@ const formSchema = z.object({
   }),
   // Financial fields
   purchasePrice: z.coerce.number().optional(),
-  purchaseDate: z.string().optional(), // Changed to string to handle date input
+  purchaseDate: z.string().optional(),
   annualInsuranceCost: z.coerce.number().optional(),
   annualPatentCost: z.coerce.number().optional(),
 });
@@ -278,7 +274,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
             <div className="grid grid-cols-2 gap-4">
                <FormField control={form.control} name="purchasePrice" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Precio de Compra</FormLabel>
+                        <FormLabel>Precio de Compra (USD)</FormLabel>
                         <FormControl>
                             <Input type="number" placeholder="e.g., 25000" {...field} value={field.value ?? ''} />
                         </FormControl>
@@ -303,7 +299,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
              <div className="grid grid-cols-2 gap-4">
                <FormField control={form.control} name="annualInsuranceCost" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Costo Anual Seguro</FormLabel>
+                        <FormLabel>Costo Anual Seguro (USD)</FormLabel>
                         <FormControl>
                             <Input type="number" placeholder="e.g., 1200" {...field} value={field.value ?? ''} />
                         </FormControl>
@@ -312,7 +308,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
                 )} />
                 <FormField control={form.control} name="annualPatentCost" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Costo Anual Patente</FormLabel>
+                        <FormLabel>Costo Anual Patente (USD)</FormLabel>
                         <FormControl>
                             <Input type="number" placeholder="e.g., 800" {...field} value={field.value ?? ''} />
                         </FormControl>
