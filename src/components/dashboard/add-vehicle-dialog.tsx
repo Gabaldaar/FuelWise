@@ -116,7 +116,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
     const vehicleData = {
         ...values,
         id: vehicleId,
-        purchaseDate: values.purchaseDate ? values.purchaseDate.toISOString() : undefined,
+        purchaseDate: values.purchaseDate ? values.purchaseDate.toISOString() : null,
         imageUrl: values.imageUrl || `https://picsum.photos/seed/${vehicleId}/600/400`,
         imageHint: `${values.make.toLowerCase()} ${values.model.toLowerCase()}`,
     };
@@ -278,7 +278,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
             <div className="grid grid-cols-2 gap-4">
                <FormField control={form.control} name="purchasePrice" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Precio de Compra (USD)</FormLabel>
+                        <FormLabel>Precio de Compra</FormLabel>
                         <FormControl>
                             <Input type="number" placeholder="e.g., 25000" {...field} value={field.value ?? ''} />
                         </FormControl>
@@ -301,7 +301,16 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
                             </FormControl>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                            <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                captionLayout="dropdown-nav"
+                                fromYear={1950}
+                                toYear={new Date().getFullYear()}
+                                disabled={(date) => date > new Date()}
+                                initialFocus
+                            />
                             </PopoverContent>
                         </Popover>
                         <FormMessage />
@@ -312,7 +321,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
              <div className="grid grid-cols-2 gap-4">
                <FormField control={form.control} name="annualInsuranceCost" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Costo Anual Seguro (USD)</FormLabel>
+                        <FormLabel>Costo Anual Seguro</FormLabel>
                         <FormControl>
                             <Input type="number" placeholder="e.g., 1200" {...field} value={field.value ?? ''} />
                         </FormControl>
@@ -321,7 +330,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
                 )} />
                 <FormField control={form.control} name="annualPatentCost" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Costo Anual Patente (USD)</FormLabel>
+                        <FormLabel>Costo Anual Patente</FormLabel>
                         <FormControl>
                             <Input type="number" placeholder="e.g., 800" {...field} value={field.value ?? ''} />
                         </FormControl>
@@ -342,5 +351,3 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
     </Dialog>
   );
 }
-
-    
