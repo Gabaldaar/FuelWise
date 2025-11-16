@@ -141,43 +141,43 @@ export default function ReportsPage() {
       return serviceDate >= from && serviceDate <= to;
     });
 
-    // --- New Fixed Costs & Amortization Calculation ---
+    // --- Fixed Costs & Amortization Calculation ---
     const periodDays = Math.max(differenceInDays(to, from) + 1, 1);
     let dailyDepreciation = 0;
-    let dailyInsurance = 0;
-    let dailyPatent = 0;
-
     if (vehicle.purchasePrice && vehicle.purchasePrice > 0) {
-      const usefulLifeYears = 10; // Standard useful life of 10 years
+      const usefulLifeYears = 10;
       dailyDepreciation = vehicle.purchasePrice / (usefulLifeYears * 365);
     }
-    if (vehicle.annualInsuranceCost) {
-        dailyInsurance = vehicle.annualInsuranceCost / 365;
-    }
-    if (vehicle.annualPatentCost) {
-        dailyPatent = vehicle.annualPatentCost / 365;
-    }
+    const dailyInsurance = (vehicle.annualInsuranceCost || 0) / 365;
+    const dailyPatent = (vehicle.annualPatentCost || 0) / 365;
     const dailyFixedCost = dailyDepreciation + dailyInsurance + dailyPatent;
     const totalFixedCostInPeriod = dailyFixedCost * periodDays;
 
 
-    const totalFuelCost = fuelLogs.reduce((acc, log) => acc + log.totalCost, 0);
-    const totalServiceCost = services.reduce((acc, service) => acc + (service.cost || 0), 0);
-    const totalOperativeCost = totalFuelCost + totalServiceCost;
-
+    // --- Operative Costs Calculation (in both currencies) ---
+    const totalFuelCostARS = fuelLogs.reduce((acc, log) => acc + log.totalCost, 0);
+    const totalServiceCostARS = services.reduce((acc, service) => acc + (service.cost || 0), 0);
+    const totalOperativeCostARS = totalFuelCostARS + totalServiceCostARS;
+    
+    // Now in USD
+    const totalFuelCostUSD = fuelLogs.reduce((acc, log) => acc + (log.totalCostUsd || 0), 0);
+    const totalServiceCostUSD = services.reduce((acc, service) => acc + (service.costUsd || 0), 0);
+    const totalOperativeCostUSD = totalFuelCostUSD + totalServiceCostUSD;
 
     if (fuelLogs.length === 0) return { empty: true };
 
     const firstLog = fuelLogs[0];
     const lastLog = fuelLogs[fuelLogs.length - 1];
     const kmTraveled = lastLog.odometer - firstLog.odometer;
+
+    const totalRealCostUSD = totalOperativeCostUSD + totalFixedCostInPeriod;
     
     // Costs per KM
-    const operativeCostPerKm = kmTraveled > 0 ? totalOperativeCost / kmTraveled : 0;
-    const fixedCostPerKm = kmTraveled > 0 ? totalFixedCostInPeriod / kmTraveled : 0; // In USD
+    const operativeCostPerKmARS = kmTraveled > 0 ? totalOperativeCostARS / kmTraveled : 0;
+    const realCostPerKmUSD = kmTraveled > 0 ? totalRealCostUSD / kmTraveled : 0;
     
     // Other calculations
-    const costPerDay = totalOperativeCost / periodDays;
+    const operativeCostPerDayARS = totalOperativeCostARS / periodDays;
     
     const consumptionLogs = fuelLogs.filter(log => log.consumption && log.consumption > 0);
     const avgConsumption = consumptionLogs.length > 0 ? consumptionLogs.reduce((sum, log) => sum + log.consumption!, 0) / consumptionLogs.length : 0;
@@ -200,15 +200,17 @@ export default function ReportsPage() {
     const avgKmBetweenFillUps = fillUpIntervals > 0 ? totalDistanceBetweenFillUps / fillUpIntervals : 0;
 
     return {
-      totalOperativeCost, totalFuelCost, totalServiceCost, kmTraveled,
-      operativeCostPerKm,
-      costPerDay,
+      totalOperativeCost: totalOperativeCostARS, totalFuelCost: totalFuelCostARS, totalServiceCost: totalServiceCostARS, kmTraveled,
+      operativeCostPerKm: operativeCostPerKmARS,
+      costPerDay: operativeCostPerDayARS,
       avgConsumption, minConsumption, maxConsumption,
       kmPerDay, fuelLogs, avgAutonomy, avgKmBetweenFillUps, empty: false,
-      // New amortization values
+      // Amortization values in USD
       totalFixedCostInPeriod,
       dailyFixedCost,
-      fixedCostPerKm,
+      // Real cost values in USD
+      totalRealCostUSD,
+      realCostPerKmUSD,
     };
   }, [dateRange, vehicle, allFuelLogsData, allServicesData]);
 
@@ -279,10 +281,10 @@ export default function ReportsPage() {
                     ) : (
                         <div className="space-y-6">
                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                <ReportStatCard icon={DollarSign} title="Costo Operativo Total" value={formatCurrency(reportData.totalOperativeCost)} description="Combustible + Servicios" />
+                                <ReportStatCard icon={DollarSign} title="Costo Operativo Total (ARS)" value={formatCurrency(reportData.totalOperativeCost)} description="Combustible + Servicios" />
                                 <ReportStatCard icon={TrendingDown} title="Costo Fijo Total (USD)" value={formatCurrency(reportData.totalFixedCostInPeriod, 'USD')} description="Amortización, Seguro y Patente" />
                                 <ReportStatCard icon={Route} title="Distancia Recorrida" value={`${reportData.kmTraveled.toLocaleString()} km`} />
-                                <ReportStatCard icon={Car} title="Costo Real / km (USD)" value={formatCurrency(reportData.fixedCostPerKm, 'USD')} description='Costos fijos por km' />
+                                <ReportStatCard icon={Car} title="Costo Real Total / km (USD)" value={formatCurrency(reportData.realCostPerKmUSD, 'USD')} description='Costos fijos + operativos' />
                             </div>
 
                             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -291,11 +293,11 @@ export default function ReportsPage() {
                                     <CardTitle className="flex items-center gap-2"><DollarSign/> Análisis de Costos</CardTitle>
                                     </CardHeader>
                                     <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                        <ReportStatCard icon={Fuel} title="Costo Operativo / km" value={`${formatCurrency(reportData.operativeCostPerKm)}`} variant="small" />
-                                        <ReportStatCard icon={Car} title="Costo Operativo / día" value={`${formatCurrency(reportData.costPerDay)}`} variant="small" />
+                                        <ReportStatCard icon={Fuel} title="Costo Operativo / km (ARS)" value={`${formatCurrency(reportData.operativeCostPerKm)}`} variant="small" />
+                                        <ReportStatCard icon={Car} title="Costo Operativo / día (ARS)" value={`${formatCurrency(reportData.costPerDay)}`} variant="small" />
                                         <ReportStatCard icon={TrendingDown} title="Costo Fijo / día (USD)" value={`${formatCurrency(reportData.dailyFixedCost, 'USD')}`} variant="small" description='Depreciación, seguro y patente' />
-                                        <ReportStatCard icon={Wrench} title="Gasto en Servicios" value={`${formatCurrency(reportData.totalServiceCost)}`} variant="small" />
-                                        <ReportStatCard icon={Fuel} title="Gasto en Combustible" value={`${formatCurrency(reportData.totalFuelCost)}`} variant="small" />
+                                        <ReportStatCard icon={Wrench} title="Gasto en Servicios (ARS)" value={`${formatCurrency(reportData.totalServiceCost)}`} variant="small" />
+                                        <ReportStatCard icon={Fuel} title="Gasto en Combustible (ARS)" value={`${formatCurrency(reportData.totalFuelCost)}`} variant="small" />
                                     </CardContent>
                                 </Card>
                                 
