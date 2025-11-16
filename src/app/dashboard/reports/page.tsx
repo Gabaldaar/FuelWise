@@ -30,7 +30,7 @@ function processFuelLogs(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
       const consumption = distanceTraveled > 0 && log.liters > 0 ? distanceTraveled / log.liters : 0;
       return { ...log, distanceTraveled, consumption: parseFloat(consumption.toFixed(2)) };
     }
-    return { ...log };
+    return { ...log, distanceTraveled: log.odometer - prevLog.odometer };
   });
   return calculatedLogs;
 }
@@ -127,6 +127,37 @@ export default function ReportsPage() {
       return null;
     }
 
+    // --- GLOBAL CALCULATIONS FOR REAL COST PER KM ---
+    let totalRealCostUSD = 0;
+    let totalKmTraveled = 0;
+    let globalRealCostPerKmUSD = 0;
+    
+    if (allFuelLogsData.length > 1) {
+      const firstEverLog = allFuelLogsData[0];
+      const lastEverLog = allFuelLogsData[allFuelLogsData.length - 1];
+      totalKmTraveled = lastEverLog.odometer - firstEverLog.odometer;
+
+      const totalFuelCostUSD = allFuelLogsData.reduce((acc, log) => acc + (log.totalCostUsd || 0), 0);
+      const totalServiceCostUSD = allServicesData.reduce((acc, service) => acc + (service.costUsd || 0), 0);
+      const totalOperativeCostUSD_Global = totalFuelCostUSD + totalServiceCostUSD;
+
+      let totalFixedCostUSD_Global = 0;
+      if (vehicle.purchaseDate) {
+          const daysSincePurchase = differenceInDays(new Date(), new Date(vehicle.purchaseDate));
+          const dailyDepreciation = vehicle.purchasePrice && vehicle.usefulLifeYears ? (vehicle.purchasePrice - (vehicle.resaleValue || 0)) / (vehicle.usefulLifeYears * 365) : 0;
+          const dailyInsurance = (vehicle.annualInsuranceCost || 0) / 365;
+          const dailyPatent = (vehicle.annualPatentCost || 0) / 365;
+          const dailyFixedCost = dailyDepreciation + dailyInsurance + dailyPatent;
+          totalFixedCostUSD_Global = dailyFixedCost * daysSincePurchase;
+      }
+
+      totalRealCostUSD = totalOperativeCostUSD_Global + totalFixedCostUSD_Global;
+      globalRealCostPerKmUSD = totalKmTraveled > 0 ? totalRealCostUSD / totalKmTraveled : 0;
+    }
+    // --- END GLOBAL CALCULATIONS ---
+
+
+    // --- PERIOD-SPECIFIC CALCULATIONS ---
     const from = startOfDay(dateRange.from);
     const to = endOfDay(dateRange.to);
 
@@ -141,64 +172,44 @@ export default function ReportsPage() {
         return serviceDate >= from && serviceDate <= to;
     });
     
-    // Fallback logic for missing exchange rates
     const validRates = [...logsInPeriod, ...servicesInPeriod]
         .map(item => item.exchangeRate)
         .filter((rate): rate is number => typeof rate === 'number' && rate > 0);
     
     const avgExchangeRate = validRates.length > 0 ? validRates.reduce((sum, rate) => sum + rate, 0) / validRates.length : 0;
 
-    const fuelLogs = processFuelLogs(logsInPeriod).map(log => {
-        if (log.totalCostUsd === undefined && avgExchangeRate > 0) {
-            return { ...log, totalCostUsd: log.totalCost / avgExchangeRate };
-        }
-        return log;
-    });
-
-    const services = servicesInPeriod.map(service => {
-        if (service.costUsd === undefined && avgExchangeRate > 0 && service.cost) {
-            return { ...service, costUsd: service.cost / avgExchangeRate };
-        }
-        return service;
-    });
-
-
-    // --- Fixed Costs & Amortization Calculation ---
+    const fuelLogs = processFuelLogs(logsInPeriod).map(log => ({
+        ...log,
+        totalCostUsd: log.totalCostUsd || (avgExchangeRate > 0 ? log.totalCost / avgExchangeRate : 0)
+    }));
+    
+    const services = servicesInPeriod.map(service => ({
+        ...service,
+        costUsd: service.costUsd || (avgExchangeRate > 0 && service.cost ? service.cost / avgExchangeRate : 0)
+    }));
+    
     const periodDays = Math.max(differenceInDays(to, from) + 1, 1);
-    let dailyDepreciation = 0;
-    if (vehicle.purchasePrice && vehicle.purchasePrice > 0) {
-      const usefulLifeYears = 10;
-      dailyDepreciation = vehicle.purchasePrice / (usefulLifeYears * 365);
+    let dailyFixedCost = 0;
+    if (vehicle.purchasePrice && vehicle.usefulLifeYears) {
+        const dailyDepreciation = (vehicle.purchasePrice - (vehicle.resaleValue || 0)) / (vehicle.usefulLifeYears * 365);
+        const dailyInsurance = (vehicle.annualInsuranceCost || 0) / 365;
+        const dailyPatent = (vehicle.annualPatentCost || 0) / 365;
+        dailyFixedCost = dailyDepreciation + dailyInsurance + dailyPatent;
     }
-    const dailyInsurance = (vehicle.annualInsuranceCost || 0) / 365;
-    const dailyPatent = (vehicle.annualPatentCost || 0) / 365;
-    const dailyFixedCost = dailyDepreciation + dailyInsurance + dailyPatent;
     const totalFixedCostInPeriod = dailyFixedCost * periodDays;
 
 
-    // --- Operative Costs Calculation (in both currencies) ---
     const totalFuelCostARS = fuelLogs.reduce((acc, log) => acc + log.totalCost, 0);
     const totalServiceCostARS = services.reduce((acc, service) => acc + (service.cost || 0), 0);
     const totalOperativeCostARS = totalFuelCostARS + totalServiceCostARS;
     
-    // Now in USD
-    const totalFuelCostUSD = fuelLogs.reduce((acc, log) => acc + (log.totalCostUsd || 0), 0);
-    const totalServiceCostUSD = services.reduce((acc, service) => acc + (service.costUsd || 0), 0);
-    const totalOperativeCostUSD = totalFuelCostUSD + totalServiceCostUSD;
-
-    if (fuelLogs.length === 0) return { empty: true };
+    if (fuelLogs.length === 0) return { empty: true, realCostPerKmUSD: globalRealCostPerKmUSD };
 
     const firstLog = fuelLogs[0];
     const lastLog = fuelLogs[fuelLogs.length - 1];
     const kmTraveled = lastLog.odometer - firstLog.odometer;
-
-    const totalRealCostUSD = totalOperativeCostUSD + totalFixedCostInPeriod;
     
-    // Costs per KM
     const operativeCostPerKmARS = kmTraveled > 0 ? totalOperativeCostARS / kmTraveled : 0;
-    const realCostPerKmUSD = kmTraveled > 0 ? totalRealCostUSD / kmTraveled : 0;
-    
-    // Other calculations
     const operativeCostPerDayARS = totalOperativeCostARS / periodDays;
     
     const consumptionLogs = fuelLogs.filter(log => log.consumption && log.consumption > 0);
@@ -207,7 +218,7 @@ export default function ReportsPage() {
     const maxConsumption = consumptionLogs.length > 0 ? Math.max(...consumptionLogs.map(log => log.consumption!)) : 0;
     
     const kmPerDay = kmTraveled / periodDays;
-    const avgAutonomy = avgConsumption > 0 ? avgConsumption * vehicle.fuelCapacityLiters : 0;
+    const avgAutonomy = avgConsumption > 0 ? (vehicle.averageConsumptionKmPerLiter || 0) * vehicle.fuelCapacityLiters : 0;
     
     const fillUpLogs = fuelLogs.filter(log => log.isFillUp);
     let totalDistanceBetweenFillUps = 0;
@@ -227,12 +238,9 @@ export default function ReportsPage() {
       costPerDay: operativeCostPerDayARS,
       avgConsumption, minConsumption, maxConsumption,
       kmPerDay, fuelLogs, avgAutonomy, avgKmBetweenFillUps, empty: false,
-      // Amortization values in USD
       totalFixedCostInPeriod,
       dailyFixedCost,
-      // Real cost values in USD
-      totalRealCostUSD,
-      realCostPerKmUSD,
+      realCostPerKmUSD: globalRealCostPerKmUSD,
     };
   }, [dateRange, vehicle, allFuelLogsData, allServicesData]);
 
@@ -303,16 +311,16 @@ export default function ReportsPage() {
                     ) : (
                         <div className="space-y-6">
                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                <ReportStatCard icon={DollarSign} title="Costo Operativo Total (ARS)" value={formatCurrency(reportData.totalOperativeCost)} description="Combustible + Servicios" />
-                                <ReportStatCard icon={TrendingDown} title="Costo Fijo Total (USD)" value={formatCurrency(reportData.totalFixedCostInPeriod, 'USD')} description="Amortización, Seguro y Patente" />
-                                <ReportStatCard icon={Route} title="Distancia Recorrida" value={`${reportData.kmTraveled.toLocaleString()} km`} />
-                                <ReportStatCard icon={Car} title="Costo Real Total / km (USD)" value={formatCurrency(reportData.realCostPerKmUSD, 'USD')} description='Costos fijos + operativos' />
+                                <ReportStatCard icon={DollarSign} title="Costo Operativo del Período (ARS)" value={formatCurrency(reportData.totalOperativeCost)} description="Combustible + Servicios" />
+                                <ReportStatCard icon={TrendingDown} title="Costo Fijo del Período (USD)" value={formatCurrency(reportData.totalFixedCostInPeriod, 'USD')} description="Amortización, Seguro y Patente" />
+                                <ReportStatCard icon={Route} title="Distancia Recorrida en Período" value={`${reportData.kmTraveled.toLocaleString()} km`} />
+                                <ReportStatCard icon={Car} title="Costo Real Global / km (USD)" value={formatCurrency(reportData.realCostPerKmUSD, 'USD')} description='Costo histórico real por km' />
                             </div>
 
                             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                                 <Card>
                                     <CardHeader>
-                                    <CardTitle className="flex items-center gap-2"><DollarSign/> Análisis de Costos</CardTitle>
+                                    <CardTitle className="flex items-center gap-2"><DollarSign/> Análisis de Costos (Período)</CardTitle>
                                     </CardHeader>
                                     <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                         <ReportStatCard icon={Fuel} title="Costo Operativo / km (ARS)" value={`${formatCurrency(reportData.operativeCostPerKm)}`} variant="small" />
@@ -325,7 +333,7 @@ export default function ReportsPage() {
                                 
                                 <Card>
                                     <CardHeader>
-                                    <CardTitle className="flex items-center gap-2"><Gauge/> Análisis de Consumo y Distancia</CardTitle>
+                                    <CardTitle className="flex items-center gap-2"><Gauge/> Análisis de Consumo y Distancia (Período)</CardTitle>
                                     </CardHeader>
                                     <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                         <ReportStatCard title="Autonomía Promedio" value={`${reportData.avgAutonomy.toFixed(0)} km`} description="con tanque lleno" variant="small" />
@@ -368,3 +376,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    

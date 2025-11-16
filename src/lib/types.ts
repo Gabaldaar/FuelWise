@@ -1,9 +1,4 @@
 
-
-
-
-
-
 export type Vehicle = {
   id: string;
   make: string;
@@ -115,8 +110,5 @@ export type TimelineItem = {
   date: string;
   data: ProcessedFuelLog | ProcessedServiceReminder | Trip;
 };
-
-
-    
 
     
