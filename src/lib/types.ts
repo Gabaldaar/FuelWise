@@ -1,6 +1,7 @@
 
 
 
+
 export type Vehicle = {
   id: string;
   make: string;
@@ -14,7 +15,7 @@ export type Vehicle = {
   defaultFuelType?: string;
   // Financial data for amortization
   purchasePrice?: number;
-  purchaseDate?: string; // ISO Date string
+  purchaseDate?: string | null; // ISO Date string
   annualInsuranceCost?: number;
   annualPatentCost?: number;
 };

@@ -54,7 +54,7 @@ const formSchema = z.object({
   }),
   // Financial fields
   purchasePrice: z.coerce.number().optional(),
-  purchaseDate: z.date().optional(),
+  purchaseDate: z.string().optional(), // Changed to string to handle date input
   annualInsuranceCost: z.coerce.number().optional(),
   annualPatentCost: z.coerce.number().optional(),
 });
@@ -93,7 +93,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
       imageUrl: vehicle?.imageUrl || '',
       defaultFuelType: vehicle?.defaultFuelType,
       purchasePrice: vehicle?.purchasePrice,
-      purchaseDate: vehicle?.purchaseDate ? new Date(vehicle.purchaseDate) : undefined,
+      purchaseDate: vehicle?.purchaseDate ? format(new Date(vehicle.purchaseDate), 'yyyy-MM-dd') : '',
       annualInsuranceCost: vehicle?.annualInsuranceCost,
       annualPatentCost: vehicle?.annualPatentCost,
     },
@@ -116,7 +116,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
     const vehicleData = {
         ...values,
         id: vehicleId,
-        purchaseDate: values.purchaseDate ? values.purchaseDate.toISOString() : null,
+        purchaseDate: values.purchaseDate ? new Date(values.purchaseDate).toISOString() : null,
         imageUrl: values.imageUrl || `https://picsum.photos/seed/${vehicleId}/600/400`,
         imageHint: `${values.make.toLowerCase()} ${values.model.toLowerCase()}`,
     };
@@ -141,7 +141,7 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
           imageUrl: '',
           defaultFuelType: undefined,
           purchasePrice: undefined,
-          purchaseDate: undefined,
+          purchaseDate: '',
           annualInsuranceCost: undefined,
           annualPatentCost: undefined,
         });
@@ -285,37 +285,19 @@ export default function AddVehicleDialog({ vehicle, children }: AddVehicleDialog
                         <FormMessage />
                     </FormItem>
                 )} />
-                <FormField control={form.control} name="purchaseDate" render={({ field }) => (
-                    <FormItem className="flex flex-col pt-2">
-                        <FormLabel>Fecha de Compra</FormLabel>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                            <FormControl>
-                                <Button
-                                variant={"outline"}
-                                className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                >
-                                {field.value ? (format(field.value, "PPP", { locale: es })) : (<span>Elige una fecha</span>)}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                            </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                captionLayout="dropdown-nav"
-                                fromYear={1950}
-                                toYear={new Date().getFullYear()}
-                                disabled={(date) => date > new Date()}
-                                initialFocus
-                            />
-                            </PopoverContent>
-                        </Popover>
-                        <FormMessage />
+                <FormField
+                  control={form.control}
+                  name="purchaseDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fecha de Compra</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
-                )} />
+                  )}
+                />
             </div>
 
              <div className="grid grid-cols-2 gap-4">
