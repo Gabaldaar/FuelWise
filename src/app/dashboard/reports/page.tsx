@@ -129,29 +129,32 @@ export default function ReportsPage() {
     // --- GLOBAL CALCULATIONS FOR REAL COST PER KM ---
     let globalRealCostPerKmUSD = 0;
     
-    if (allFuelLogsData.length > 1) {
+    if (allFuelLogsData.length > 1 && vehicle.purchasePrice && vehicle.purchaseDate) {
         const firstEverLog = allFuelLogsData[0];
         const lastEverLog = allFuelLogsData[allFuelLogsData.length - 1];
         const totalKmTraveled = lastEverLog.odometer - firstEverLog.odometer;
 
-        // Operative Cost
+        // 1. Total Operative Costs (USD)
         const totalFuelCostUSD = allFuelLogsData.reduce((acc, log) => acc + (log.totalCostUsd || 0), 0);
         const totalServiceCostUSD = allServicesData.reduce((acc, service) => acc + (service.costUsd || 0), 0);
         const totalOperativeCostUSD = totalFuelCostUSD + totalServiceCostUSD;
-        const operativeCostPerKmUSD = totalKmTraveled > 0 ? totalOperativeCostUSD / totalKmTraveled : 0;
-        
-        // Fixed Cost
-        const annualFixedCost = (vehicle.annualInsuranceCost || 0) + (vehicle.annualPatentCost || 0);
-        const depreciation = vehicle.purchasePrice && vehicle.usefulLifeYears ? (vehicle.purchasePrice - (vehicle.resaleValue || 0)) / vehicle.usefulLifeYears : 0;
-        const totalAnnualFixedCost = annualFixedCost + depreciation;
-        
-        const yearsSincePurchase = vehicle.purchaseDate ? differenceInCalendarYears(new Date(), new Date(vehicle.purchaseDate)) : 0;
-        const totalKmInHistory = allFuelLogsData.length > 1 ? allFuelLogsData[allFuelLogsData.length - 1].odometer - allFuelLogsData[0].odometer : 0;
-        const kmPerYearEstimate = yearsSincePurchase > 0 ? totalKmInHistory / yearsSincePurchase : 15000; // Default 15k km/year
 
-        const fixedCostPerKm = kmPerYearEstimate > 0 ? totalAnnualFixedCost / kmPerYearEstimate : 0;
-
-        globalRealCostPerKmUSD = operativeCostPerKmUSD + fixedCostPerKm;
+        // 2. Total Fixed Costs (USD)
+        const daysSincePurchase = differenceInDays(new Date(), new Date(vehicle.purchaseDate));
+        const dailyInsuranceCost = (vehicle.annualInsuranceCost || 0) / 365;
+        const dailyPatentCost = (vehicle.annualPatentCost || 0) / 365;
+        const totalFixedCostUSD = (dailyInsuranceCost + dailyPatentCost) * daysSincePurchase;
+        
+        // 3. Total Amortization (Depreciation)
+        const purchasePrice = vehicle.purchasePrice || 0;
+        const resaleValue = vehicle.resaleValue || 0;
+        const totalAmortization = purchasePrice - resaleValue;
+        
+        // 4. Final Calculation
+        if (totalKmTraveled > 0) {
+            const totalCosts = totalOperativeCostUSD + totalFixedCostUSD + totalAmortization;
+            globalRealCostPerKmUSD = totalCosts / totalKmTraveled;
+        }
     }
     // --- END GLOBAL CALCULATIONS ---
 
@@ -193,8 +196,8 @@ export default function ReportsPage() {
     
     const periodDays = Math.max(differenceInDays(to, from) + 1, 1);
     let dailyFixedCost = 0;
-    if (vehicle.purchasePrice && vehicle.usefulLifeYears) {
-        const dailyDepreciation = (vehicle.purchasePrice - (vehicle.resaleValue || 0)) / (vehicle.usefulLifeYears * 365);
+    if (vehicle.purchasePrice) {
+        const dailyDepreciation = vehicle.usefulLifeYears ? (vehicle.purchasePrice - (vehicle.resaleValue || 0)) / (vehicle.usefulLifeYears * 365) : 0;
         const dailyInsurance = (vehicle.annualInsuranceCost || 0) / 365;
         const dailyPatent = (vehicle.annualPatentCost || 0) / 365;
         dailyFixedCost = dailyDepreciation + dailyInsurance + dailyPatent;
@@ -317,7 +320,7 @@ export default function ReportsPage() {
                                 <ReportStatCard icon={DollarSign} title="Costo Operativo del Período (ARS)" value={formatCurrency(reportData.totalOperativeCost)} description="Combustible + Servicios" />
                                 <ReportStatCard icon={TrendingDown} title="Costo Fijo del Período (USD)" value={formatCurrency(reportData.totalFixedCostInPeriod, 'USD')} description="Amortización, Seguro y Patente" />
                                 <ReportStatCard icon={Route} title="Distancia Recorrida en Período" value={`${reportData.kmTraveled.toLocaleString()} km`} />
-                                <ReportStatCard icon={Car} title="Costo Real Global / km (USD)" value={formatCurrency(reportData.realCostPerKmUSD, 'USD')} description='Costo histórico real por km' />
+                                <ReportStatCard icon={Car} title="Costo Real Global / km (USD)" value={reportData.realCostPerKmUSD > 0 ? formatCurrency(reportData.realCostPerKmUSD, 'USD') : 'N/A'} description='Costo histórico real por km' />
                             </div>
 
                             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
