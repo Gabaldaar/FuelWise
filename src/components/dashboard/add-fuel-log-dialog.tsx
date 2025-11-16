@@ -251,10 +251,10 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
     setIsFetchingRate(true);
     try {
         const rate = await getDolarBlueRate();
-        setValue('exchangeRate', rate.compra.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), { shouldValidate: true });
+        setValue('exchangeRate', rate.average.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), { shouldValidate: true });
         toast({
             title: 'Cotización Obtenida',
-            description: `Dólar Blue (Compra): ${rate.compra}`,
+            description: `Dólar (Promedio): ${rate.average}`,
         });
     } catch (error: any) {
         toast({

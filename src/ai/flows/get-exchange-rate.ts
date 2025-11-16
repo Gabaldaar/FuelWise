@@ -5,11 +5,17 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
-const ExchangeRateOutputSchema = z.object({
+const ExchangeRateApiResponseSchema = z.object({
   compra: z.number().describe('The buying price of the Dolar Blue.'),
   venta: z.number().describe('The selling price of the Dolar Blue.'),
+  fechaActualizacion: z.string().describe('The date of the exchange rate.'),
+});
+
+const ExchangeRateOutputSchema = z.object({
+  average: z.number().describe('The average price between buy and sell.'),
   fecha: z.string().describe('The date of the exchange rate.'),
 });
+
 
 export type ExchangeRateOutput = z.infer<typeof ExchangeRateOutputSchema>;
 
@@ -25,14 +31,22 @@ export async function getDolarBlueRate(): Promise<ExchangeRateOutput> {
     }
     const data = await response.json();
 
-    // Validate the response with Zod
-    const parsedData = ExchangeRateOutputSchema.parse({
-        compra: data.compra,
-        venta: data.venta,
-        fecha: data.fechaActualizacion,
-    });
+    // Validate the API response with Zod
+    const parsedApiData = ExchangeRateApiResponseSchema.parse(data);
 
-    return parsedData;
+    const { compra, venta, fechaActualizacion } = parsedApiData;
+    
+    let average: number;
+    if (compra > 0 && venta > 0) {
+        average = (compra + venta) / 2;
+    } else {
+        average = venta > 0 ? venta : compra;
+    }
+
+    return {
+        average,
+        fecha: fechaActualizacion,
+    };
 
   } catch (error) {
     console.error('[getDolarBlueRate] Error fetching or parsing data:', error);
