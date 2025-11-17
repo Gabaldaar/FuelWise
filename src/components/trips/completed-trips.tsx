@@ -1,10 +1,10 @@
 'use client';
 
-import type { Trip, ProcessedFuelLog, Vehicle, TripExpense } from '@/lib/types';
+import type { Trip, ProcessedFuelLog, Vehicle } from '@/lib/types';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Map, Edit, Trash2, Clock, Droplets, Wallet, Route, CircleDollarSign, User, Wand2, Loader2, TrendingUp } from 'lucide-react';
-import { formatDateTime, formatCurrency } from '@/lib/utils';
+import { Map, Edit, Trash2, Clock, Droplets, Wallet, Route, User, Wand2, Loader2, TrendingUp, DollarSign } from 'lucide-react';
+import { formatDateTime, formatCurrency, parseCurrency } from '@/lib/utils';
 import AddTripDialog from '../dashboard/add-trip-dialog';
 import { Button } from '../ui/button';
 import { useMemo, useState } from 'react';
@@ -14,6 +14,8 @@ import { calculateCostsPerKm, calculateTotalCostInARS } from '@/lib/cost-calcula
 import { getDolarBlueRate } from '@/ai/flows/get-exchange-rate';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '../ui/separator';
+import { Label } from '../ui/label';
+import { Input } from '../ui/input';
 
 interface TripDetailsProps {
     trip: Trip;
@@ -152,57 +154,65 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
                 <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
                     <Button onClick={handleFetchRate} disabled={isFetchingRate} variant="outline" size="sm">
                         {isFetchingRate ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Wand2 className="mr-2 h-4 w-4" />}
-                        Calcular Costo Real
+                        Usar Cambio Actual
                     </Button>
-                    {exchangeRate && <p className="text-xs text-muted-foreground">Usando cambio 1 USD = {formatCurrency(exchangeRate)} ARS</p>}
+                    <div className="w-full sm:w-auto">
+                        <Label htmlFor={`exchange-rate-${trip.id}`} className="sr-only">Tipo de Cambio</Label>
+                        <Input 
+                            id={`exchange-rate-${trip.id}`}
+                            type="text" 
+                            placeholder="...o ingresa un valor"
+                            value={exchangeRate !== null ? exchangeRate.toLocaleString('es-AR') : ''}
+                            onChange={(e) => setExchangeRate(parseCurrency(e.target.value))}
+                            className="h-9"
+                        />
+                    </div>
                 </div>
                 
-                {exchangeRate && (
+                {exchangeRate !== null && (
                     <div className="space-y-4">
-                        {/* Fuel Cost Breakdown */}
-                        <div className="p-3 rounded-lg bg-muted/30">
-                            <p className="font-semibold text-sm mb-2 flex items-center gap-2"><Droplets className="h-4 w-4"/>Costos de Combustible</p>
-                             <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <p className="font-medium">{formatCurrency(fuelCostPerKm_ARS)}</p>
-                                    <p className="text-xs text-muted-foreground">Costo/km</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Fuel Cost Breakdown */}
+                            <div className="p-3 rounded-lg bg-muted/30 space-y-2">
+                                <p className="font-semibold text-sm flex items-center gap-2"><Droplets className="h-4 w-4"/>Costos de Combustible</p>
+                                <div className="flex justify-between items-baseline text-sm">
+                                    <span className="text-muted-foreground">Costo/km:</span>
+                                    <span className="font-medium">{formatCurrency(fuelCostPerKm_ARS)}</span>
                                 </div>
-                                <div>
-                                    <p className="font-medium">{formatCurrency(fuelCostForTrip)}</p>
-                                    <p className="text-xs text-muted-foreground">Total para {kmTraveled.toLocaleString()} km</p>
+                                <div className="flex justify-between items-baseline text-sm">
+                                    <span className="text-muted-foreground">Total ({kmTraveled.toLocaleString()} km):</span>
+                                    <span className="font-medium">{formatCurrency(fuelCostForTrip)}</span>
                                 </div>
                             </div>
+
+                            {/* Total Vehicle Cost Breakdown */}
+                            {totalVehicleCostPerKm_ARS !== null && (
+                                <div className="p-3 rounded-lg bg-muted/30 space-y-2">
+                                    <p className="font-semibold text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4"/>Costo Total del Vehículo</p>
+                                     <div className="flex justify-between items-baseline text-sm">
+                                        <span className="text-muted-foreground">Costo/km Real:</span>
+                                        <span className="font-medium">{formatCurrency(totalVehicleCostPerKm_ARS)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-baseline text-sm">
+                                        <span className="text-muted-foreground">Total ({kmTraveled.toLocaleString()} km):</span>
+                                        <span className="font-medium">{formatCurrency(totalVehicleCostForTrip!)}</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Total Vehicle Cost Breakdown */}
-                        {totalVehicleCostPerKm_ARS !== null && (
-                            <div className="p-3 rounded-lg bg-muted/30">
-                                <p className="font-semibold text-sm mb-2 flex items-center gap-2"><TrendingUp className="h-4 w-4"/>Costo Total del Vehículo</p>
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <p className="font-medium">{formatCurrency(totalVehicleCostPerKm_ARS)}</p>
-                                        <p className="text-xs text-muted-foreground">Costo/km Real</p>
-                                    </div>
-                                    <div>
-                                        <p className="font-medium">{formatCurrency(totalVehicleCostForTrip!)}</p>
-                                        <p className="text-xs text-muted-foreground">Total para {kmTraveled.toLocaleString()} km</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        
                         <Separator />
 
                         {/* Final Trip Costs including other expenses */}
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <p className="font-semibold text-base">{formatCurrency(fuelCostPlusExpenses)}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-3 rounded-lg border">
                                 <p className="text-xs text-muted-foreground">Combustible + Otros Gastos</p>
+                                <p className="font-semibold text-lg">{formatCurrency(fuelCostPlusExpenses)}</p>
                             </div>
                             {totalRealCostOfTrip !== null && (
-                                <div>
-                                    <p className="font-semibold text-base text-primary">{formatCurrency(totalRealCostOfTrip)}</p>
-                                    <p className="text-xs text-muted-foreground">Costo Total Real del Viaje</p>
+                                <div className="p-3 rounded-lg border border-primary/50 bg-primary/10">
+                                    <p className="text-xs text-primary/80">Costo Total Real del Viaje</p>
+                                    <p className="font-semibold text-lg text-primary">{formatCurrency(totalRealCostOfTrip)}</p>
                                 </div>
                             )}
                         </div>
