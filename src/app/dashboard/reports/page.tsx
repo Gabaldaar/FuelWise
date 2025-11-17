@@ -43,11 +43,6 @@ export default function ReportsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 29),
-    to: new Date(),
-  });
-  
   const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
   const [isLoadingRate, setIsLoadingRate] = useState(true);
@@ -94,14 +89,33 @@ export default function ReportsPage() {
     fetchRate();
   }, [toast]);
 
-  const { availableYears, annualData } = useMemo(() => {
-    if (!allFuelLogsData) return { availableYears: [], annualData: null };
+  const costPerKmData = useMemo(() => {
+    if (!vehicle || !allFuelLogsData || !allServicesData) return null;
+    
+    const lastFuelLog = allFuelLogsData.length > 0 ? allFuelLogsData[allFuelLogsData.length - 1] : null;
+    const avgConsumption = vehicle.averageConsumptionKmPerLiter || 0;
+    const lastFuelPrice = lastFuelLog?.pricePerLiter || 0;
+
+    const costsPerKm = calculateCostsPerKm(vehicle, avgConsumption, lastFuelPrice);
+    const totalCostPerKm_ARS = exchangeRate ? calculateTotalCostInARS(costsPerKm, exchangeRate) : null;
+
+    return {
+        fuelCostPerKm: costsPerKm.fuelCostPerKm,
+        totalCostPerKm: totalCostPerKm_ARS,
+    }
+
+  }, [vehicle, allFuelLogsData, allServicesData, exchangeRate]);
+
+  const { availableYears, annualData, logsForSelectedYear } = useMemo(() => {
+    if (!allFuelLogsData || !allServicesData) return { availableYears: [], annualData: null, logsForSelectedYear: [] };
     
     const years = new Set<string>();
     allFuelLogsData.forEach(log => years.add(String(getYear(new Date(log.date)))));
     const sortedYears = Array.from(years).sort((a, b) => parseInt(b) - parseInt(a));
     
     const year = parseInt(selectedYear);
+    
+    const logsInYear = processFuelLogs(allFuelLogsData.filter(log => getYear(new Date(log.date)) === year));
     
     const monthlyData = Array.from({ length: 12 }, (_, i) => ({
       name: new Date(year, i).toLocaleString('es-ES', { month: 'short' }),
@@ -112,12 +126,10 @@ export default function ReportsPage() {
     }));
 
     // Calculate costs
-    allFuelLogsData
-      .filter(log => getYear(new Date(log.date)) === year)
-      .forEach(log => {
-        const month = getMonth(new Date(log.date));
-        monthlyData[month].combustible += log.totalCost;
-      });
+    logsInYear.forEach(log => {
+      const month = getMonth(new Date(log.date));
+      monthlyData[month].combustible += log.totalCost;
+    });
 
     allServicesData
       ?.filter(service => service.isCompleted && service.completedDate && getYear(new Date(service.completedDate)) === year)
@@ -127,9 +139,8 @@ export default function ReportsPage() {
       });
       
     // Calculate distance
-    const logsForYear = allFuelLogsData.filter(log => getYear(new Date(log.date)) === year);
     for (let i = 0; i < 12; i++) {
-        const logsInMonth = logsForYear.filter(log => getMonth(new Date(log.date)) === i);
+        const logsInMonth = logsInYear.filter(log => getMonth(new Date(log.date)) === i);
         if (logsInMonth.length > 1) {
             const firstOdo = logsInMonth[0].odometer;
             const lastOdo = logsInMonth[logsInMonth.length - 1].odometer;
@@ -140,7 +151,7 @@ export default function ReportsPage() {
 
     monthlyData.forEach(month => month.total = month.combustible + month.servicios);
 
-    return { availableYears: sortedYears, annualData: monthlyData };
+    return { availableYears: sortedYears, annualData: monthlyData, logsForSelectedYear: logsInYear };
   }, [allFuelLogsData, allServicesData, selectedYear]);
 
   useEffect(() => {
@@ -148,51 +159,6 @@ export default function ReportsPage() {
       setSelectedYear(availableYears[0]);
     }
   }, [availableYears, selectedYear]);
-
-
-  const reportData = useMemo(() => {
-    if (!vehicle || !allFuelLogsData || !allServicesData) {
-      return null;
-    }
-    
-    // --- GLOBAL COST PER KM CALCULATION ---
-    const lastFuelLog = allFuelLogsData.length > 0 ? allFuelLogsData[allFuelLogsData.length - 1] : null;
-    const avgConsumption = vehicle.averageConsumptionKmPerLiter || 0;
-    const lastFuelPrice = lastFuelLog?.pricePerLiter || 0;
-
-    const costsPerKm = calculateCostsPerKm(vehicle, avgConsumption, lastFuelPrice);
-    const totalCostPerKm_ARS = exchangeRate ? calculateTotalCostInARS(costsPerKm, exchangeRate) : null;
-    
-    // --- PERIOD-SPECIFIC CALCULATIONS ---
-     if (!dateRange?.from || !dateRange?.to) {
-        return { empty: true, fuelCostPerKm: costsPerKm.fuelCostPerKm, totalCostPerKm: totalCostPerKm_ARS };
-     }
-
-    const from = startOfDay(dateRange.from);
-    const to = endOfDay(dateRange.to);
-
-    const logsInPeriod = allFuelLogsData.filter(log => {
-        const logDate = new Date(log.date);
-        return logDate >= from && logDate <= to;
-    });
-    
-    const fuelLogs = processFuelLogs(logsInPeriod);
-    
-    if (fuelLogs.length === 0) {
-        return { empty: true, fuelCostPerKm: costsPerKm.fuelCostPerKm, totalCostPerKm: totalCostPerKm_ARS };
-    }
-    
-    const consumptionLogs = fuelLogs.filter(log => log.consumption && log.consumption > 0);
-    const periodAvgConsumption = consumptionLogs.length > 0 ? consumptionLogs.reduce((sum, log) => sum + log.consumption!, 0) / consumptionLogs.length : 0;
-
-    return {
-      empty: false,
-      fuelCostPerKm: costsPerKm.fuelCostPerKm,
-      totalCostPerKm: totalCostPerKm_ARS,
-      periodFuelLogs: fuelLogs,
-      periodAvgConsumption
-    };
-  }, [dateRange, vehicle, allFuelLogsData, allServicesData, exchangeRate]);
 
   if (!vehicle) {
     return <div className="text-center p-8">Por favor, seleccione un vehículo para ver los informes.</div>;
@@ -224,11 +190,11 @@ export default function ReportsPage() {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><DollarSign /> Costos por Kilómetro</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><DollarSign /> Costos por Kilómetro (Global)</CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <ReportStatCard icon={Fuel} title="Costo Combustible / km (ARS)" value={formatCurrency(reportData?.fuelCostPerKm || 0)} description="Costo variable de combustible por kilómetro."/>
-                   <ReportStatCard icon={Car} title="Costo Total Real / km (ARS)" value={reportData?.totalCostPerKm ? formatCurrency(reportData.totalCostPerKm) : 'N/A'} description="Incluye combustible, amortización y costos fijos."/>
+                   <ReportStatCard icon={Fuel} title="Costo Combustible / km (ARS)" value={formatCurrency(costPerKmData?.fuelCostPerKm || 0)} description="Costo variable de combustible por kilómetro."/>
+                   <ReportStatCard icon={Car} title="Costo Total Real / km (ARS)" value={costPerKmData?.totalCostPerKm ? formatCurrency(costPerKmData.totalCostPerKm) : 'N/A'} description="Incluye combustible, amortización y costos fijos."/>
                 </CardContent>
             </Card>
 
@@ -246,51 +212,33 @@ export default function ReportsPage() {
                         </Select>
                     </div>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <MonthlyCostsChart data={annualData} />
-                    <MonthlyDistanceChart data={annualData} />
-                </CardContent>
-            </Card>
-
-            <Card>
-                 <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <CardTitle className="flex items-center gap-2"><TrendingUp /> Análisis por Período</CardTitle>
-                        <DateRangePicker dateRange={dateRange} setDateRange={setDateRange} />
+                <CardContent className="space-y-6">
+                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <MonthlyCostsChart data={annualData} />
+                        <MonthlyDistanceChart data={annualData} />
                     </div>
-                </CardHeader>
-                <CardContent>
-                    {!reportData || reportData.empty ? (
-                         <div className="h-64 flex flex-col items-center justify-center rounded-lg border-2 border-dashed">
-                            <AlertTriangle className="h-12 w-12 text-muted-foreground" />
-                            <p className="mt-4 font-semibold">No hay datos en este período.</p>
-                            <p className="text-sm text-muted-foreground">Ajusta el rango de fechas para ver datos.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-6">
-                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <FuelConsumptionChart data={reportData.periodFuelLogs} />
-                                <EvolutionChart 
-                                title="Evolución del Consumo (Rendimiento)" 
-                                data={reportData.periodFuelLogs.filter(log => log.consumption && log.consumption > 0)}
-                                dataKey="date"
-                                valueKey="consumption"
-                                valueFormatter={(val) => `${val.toFixed(2)} km/L`}
-                                tooltipLabel="Rendimiento"
-                                icon={TrendingUp}
-                                />
-                                <EvolutionChart 
-                                title="Evolución del Precio del Combustible" 
-                                data={reportData.periodFuelLogs}
-                                dataKey="date"
-                                valueKey="pricePerLiter"
-                                valueFormatter={(val) => `${formatCurrency(val)} / L`}
-                                tooltipLabel="Precio/L"
-                                icon={Droplets}
-                                />
-                            </div>
-                        </div>
-                    )}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <FuelConsumptionChart data={logsForSelectedYear} />
+                        <EvolutionChart 
+                        title="Evolución del Consumo (Rendimiento)" 
+                        data={logsForSelectedYear.filter(log => log.consumption && log.consumption > 0)}
+                        dataKey="date"
+                        valueKey="consumption"
+                        valueFormatter={(val) => `${val.toFixed(2)} km/L`}
+                        tooltipLabel="Rendimiento"
+                        icon={TrendingUp}
+                        />
+                         <EvolutionChart 
+                        title="Evolución del Precio del Combustible" 
+                        data={logsForSelectedYear}
+                        dataKey="date"
+                        valueKey="pricePerLiter"
+                        valueFormatter={(val) => `${formatCurrency(val)} / L`}
+                        tooltipLabel="Precio/L"
+                        icon={Droplets}
+                        />
+                    </div>
                 </CardContent>
             </Card>
         </div>
