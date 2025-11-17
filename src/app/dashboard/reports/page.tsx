@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -97,11 +96,11 @@ export default function ReportsPage() {
     const lastFuelPrice = lastFuelLog?.pricePerLiter || 0;
 
     const costsPerKm = calculateCostsPerKm(vehicle, avgConsumption, lastFuelPrice);
-    const totalCostPerKm_ARS = exchangeRate ? calculateTotalCostInARS(costsPerKm, exchangeRate) : null;
+    const detailedCostsARS = exchangeRate ? calculateTotalCostInARS(costsPerKm, exchangeRate) : null;
 
     return {
-        fuelCostPerKm: costsPerKm.fuelCostPerKm,
-        totalCostPerKm: totalCostPerKm_ARS,
+        fuelCostPerKm: detailedCostsARS?.fuelCostPerKm_ARS || 0,
+        totalCostPerKm: detailedCostsARS?.totalCostPerKm_ARS,
     }
 
   }, [vehicle, allFuelLogsData, allServicesData, exchangeRate]);

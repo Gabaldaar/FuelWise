@@ -43,8 +43,10 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface CalculationResult {
     fuelCostPerKm: number;
-    totalVehicleCostPerKm: number | null;
+    vehicleCostPerKm: number;
+    totalCostPerKm: number | null;
     fuelCostForTrip: number;
+    vehicleCostForTrip: number;
     totalVehicleCostForTrip: number | null;
     finalFuelCost: number;
     finalTotalCost: number | null;
@@ -119,21 +121,23 @@ export default function TripCalculatorDialog({ children, allFuelLogs }: TripCalc
     const lastPricePerLiter = lastFuelLog?.pricePerLiter || 0;
 
     const costsPerKm = calculateCostsPerKm(vehicle, fallbackConsumption, lastPricePerLiter);
-    const totalVehicleCostPerKm_ARS = currentExchangeRate ? calculateTotalCostInARS(costsPerKm, currentExchangeRate) : null;
+    const detailedCostsARS = currentExchangeRate ? calculateTotalCostInARS(costsPerKm, currentExchangeRate) : null;
     
     const otherExpensesNum = parseCurrency(values.otherExpenses || '0');
 
-    const fuelCostForTrip = values.kilometers * costsPerKm.fuelCostPerKm;
-    const totalVehicleCostForTrip = totalVehicleCostPerKm_ARS ? values.kilometers * totalVehicleCostPerKm_ARS : null;
-
+    const fuelCostForTrip = values.kilometers * (detailedCostsARS?.fuelCostPerKm_ARS || 0);
+    const vehicleCostForTrip = values.kilometers * (detailedCostsARS?.vehicleCostPerKm_ARS || 0);
+    
     const finalFuelCost = fuelCostForTrip + otherExpensesNum;
-    const finalTotalCost = totalVehicleCostForTrip ? totalVehicleCostForTrip + otherExpensesNum : null;
+    const finalTotalCost = (fuelCostForTrip + vehicleCostForTrip) + otherExpensesNum;
 
     setCalculationResult({
-        fuelCostPerKm: costsPerKm.fuelCostPerKm,
-        totalVehicleCostPerKm: totalVehicleCostPerKm_ARS,
+        fuelCostPerKm: detailedCostsARS?.fuelCostPerKm_ARS || 0,
+        vehicleCostPerKm: detailedCostsARS?.vehicleCostPerKm_ARS || 0,
+        totalCostPerKm: detailedCostsARS?.totalCostPerKm_ARS || null,
         fuelCostForTrip: fuelCostForTrip,
-        totalVehicleCostForTrip: totalVehicleCostForTrip,
+        vehicleCostForTrip: vehicleCostForTrip,
+        totalVehicleCostForTrip: null, // This field seems unused now
         finalFuelCost,
         finalTotalCost,
         kmTraveled: values.kilometers,
@@ -235,16 +239,16 @@ export default function TripCalculatorDialog({ children, allFuelLogs }: TripCalc
                             </div>
                         </div>
 
-                        {calculationResult.totalVehicleCostPerKm !== null && (
+                        {calculationResult.totalCostPerKm !== null && (
                             <div className="p-3 rounded-lg bg-muted/30 space-y-2">
-                                <p className="font-semibold text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4"/>Costo Total del Vehículo</p>
+                                <p className="font-semibold text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4"/>Costo del Vehículo (Amort. y Fijos)</p>
                                 <div className="flex justify-between items-baseline text-sm">
-                                    <span className="text-muted-foreground">Costo/km Real:</span>
-                                    <span className="font-medium">{formatCurrency(calculationResult.totalVehicleCostPerKm)}</span>
+                                    <span className="text-muted-foreground">Costo/km:</span>
+                                    <span className="font-medium">{formatCurrency(calculationResult.vehicleCostPerKm)}</span>
                                 </div>
                                 <div className="flex justify-between items-baseline text-sm">
                                     <span className="text-muted-foreground">Total ({calculationResult.kmTraveled.toLocaleString()} km):</span>
-                                    <span className="font-medium">{formatCurrency(calculationResult.totalVehicleCostForTrip!)}</span>
+                                    <span className="font-medium">{formatCurrency(calculationResult.vehicleCostForTrip)}</span>
                                 </div>
                             </div>
                         )}

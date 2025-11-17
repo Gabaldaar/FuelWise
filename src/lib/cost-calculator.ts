@@ -6,6 +6,13 @@ export interface CostPerKm {
   fuelCostPerKm: number; // ARS per Km
 }
 
+export interface DetailedCostsARS {
+  fuelCostPerKm_ARS: number;
+  vehicleCostPerKm_ARS: number; // Amortization + Fixed Costs in ARS
+  totalCostPerKm_ARS: number;
+}
+
+
 /**
  * Calculates the different cost components per kilometer for a given vehicle.
  *
@@ -75,11 +82,24 @@ export function calculateCostsPerKm(
  * @param exchangeRate - The current USD to ARS exchange rate.
  * @returns The total cost per kilometer in ARS.
  */
-export function calculateTotalCostInARS(costs: CostPerKm, exchangeRate: number): number {
-    if (exchangeRate <= 0) return costs.fuelCostPerKm;
+export function calculateTotalCostInARS(costs: CostPerKm, exchangeRate: number): DetailedCostsARS {
+    const fuelCostPerKm_ARS = costs.fuelCostPerKm;
+
+    if (exchangeRate <= 0) {
+      return {
+        fuelCostPerKm_ARS,
+        vehicleCostPerKm_ARS: 0,
+        totalCostPerKm_ARS: fuelCostPerKm_ARS,
+      }
+    };
 
     const amortizationInARS = costs.amortizationPerKm * exchangeRate;
     const fixedCostInARS = costs.fixedCostPerKm * exchangeRate;
+    const vehicleCostPerKm_ARS = amortizationInARS + fixedCostInARS;
     
-    return amortizationInARS + fixedCostInARS + costs.fuelCostPerKm;
+    return {
+      fuelCostPerKm_ARS,
+      vehicleCostPerKm_ARS,
+      totalCostPerKm_ARS: vehicleCostPerKm_ARS + fuelCostPerKm_ARS,
+    }
 }
