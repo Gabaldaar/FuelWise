@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2, Wand2, Calculator, Fuel, TrendingUp, Wallet, Sparkles } from 'lucide-react';
+import { Loader2, Wand2, Calculator, Fuel, TrendingUp, Wallet, Sparkles, DollarSign } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -41,14 +41,20 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+interface CalculationResult {
+    fuelCostPerKm: number;
+    totalVehicleCostPerKm: number | null;
+    fuelCostForTrip: number;
+    totalVehicleCostForTrip: number | null;
+    finalFuelCost: number;
+    finalTotalCost: number | null;
+    kmTraveled: number;
+}
+
+
 interface TripCalculatorDialogProps {
     children: React.ReactNode;
     allFuelLogs: ProcessedFuelLog[];
-}
-
-interface CalculationResult {
-    fuelCostForTrip: number;
-    totalRealCostOfTrip: number | null;
 }
 
 export default function TripCalculatorDialog({ children, allFuelLogs }: TripCalculatorDialogProps) {
@@ -113,8 +119,13 @@ export default function TripCalculatorDialog({ children, allFuelLogs }: TripCalc
     const finalTotalCost = totalVehicleCostForTrip ? totalVehicleCostForTrip + otherExpensesNum : null;
 
     setCalculationResult({
-        fuelCostForTrip: finalFuelCost,
-        totalRealCostOfTrip: finalTotalCost,
+        fuelCostPerKm: costsPerKm.fuelCostPerKm,
+        totalVehicleCostPerKm: totalVehicleCostPerKm_ARS,
+        fuelCostForTrip: fuelCostForTrip,
+        totalVehicleCostForTrip: totalVehicleCostForTrip,
+        finalFuelCost,
+        finalTotalCost,
+        kmTraveled: values.kilometers,
     });
   }
 
@@ -196,21 +207,58 @@ export default function TripCalculatorDialog({ children, allFuelLogs }: TripCalc
         {calculationResult && (
             <div className="space-y-4 pt-4 border-t">
                 <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Resultado de la Estimación</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-3 rounded-lg border">
-                        <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Fuel className="h-3 w-3"/> Combustible + Gastos</p>
-                        <p className="font-semibold text-lg">{formatCurrency(calculationResult.fuelCostForTrip)}</p>
-                    </div>
-                    {calculationResult.totalRealCostOfTrip !== null ? (
-                        <div className="p-3 rounded-lg border border-primary/50 bg-primary/10">
-                            <p className="text-xs text-primary/80 flex items-center gap-1.5"><TrendingUp className="h-3 w-3" /> Costo Total Real</p>
-                            <p className="font-semibold text-lg text-primary">{formatCurrency(calculationResult.totalRealCostOfTrip)}</p>
+                
+                <div className="space-y-4">
+                    {/* Fuel Cost Breakdown */}
+                    <div className="p-3 rounded-lg bg-muted/30 space-y-2">
+                        <p className="font-semibold text-sm flex items-center gap-2"><Fuel className="h-4 w-4"/>Costos de Combustible</p>
+                        <div className="flex justify-between items-baseline text-sm">
+                            <span className="text-muted-foreground">Costo/km:</span>
+                            <span className="font-medium">{formatCurrency(calculationResult.fuelCostPerKm)}</span>
                         </div>
-                    ) : (
-                         <div className="p-3 rounded-lg border border-dashed text-center">
-                            <p className="text-xs text-muted-foreground">Ingresa el tipo de cambio para ver el costo total real.</p>
+                        <div className="flex justify-between items-baseline text-sm">
+                            <span className="text-muted-foreground">Total ({calculationResult.kmTraveled.toLocaleString()} km):</span>
+                            <span className="font-medium">{formatCurrency(calculationResult.fuelCostForTrip)}</span>
+                        </div>
+                    </div>
+
+                    {/* Total Vehicle Cost Breakdown */}
+                    {calculationResult.totalVehicleCostPerKm !== null && (
+                        <div className="p-3 rounded-lg bg-muted/30 space-y-2">
+                            <p className="font-semibold text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4"/>Costo Total del Vehículo</p>
+                            <div className="flex justify-between items-baseline text-sm">
+                                <span className="text-muted-foreground">Costo/km Real:</span>
+                                <span className="font-medium">{formatCurrency(calculationResult.totalVehicleCostPerKm)}</span>
+                            </div>
+                            <div className="flex justify-between items-baseline text-sm">
+                                <span className="text-muted-foreground">Total ({calculationResult.kmTraveled.toLocaleString()} km):</span>
+                                <span className="font-medium">{formatCurrency(calculationResult.totalVehicleCostForTrip!)}</span>
+                            </div>
                         </div>
                     )}
+                </div>
+
+                <Separator />
+                
+                {/* Final Trip Costs including other expenses */}
+                <div className="space-y-4">
+                    <p className="font-semibold text-sm">Costo Final Estimado del Viaje</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-3 rounded-lg border">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Wallet className="h-3 w-3" />Combustible + Otros Gastos</p>
+                            <p className="font-semibold text-lg">{formatCurrency(calculationResult.finalFuelCost)}</p>
+                        </div>
+                        {calculationResult.finalTotalCost !== null ? (
+                            <div className="p-3 rounded-lg border border-primary/50 bg-primary/10">
+                                <p className="text-xs text-primary/80 flex items-center gap-1.5"><DollarSign className="h-3 w-3" />Costo Total Real del Viaje</p>
+                                <p className="font-semibold text-lg text-primary">{formatCurrency(calculationResult.finalTotalCost)}</p>
+                            </div>
+                        ) : (
+                            <div className="p-3 rounded-lg border border-dashed text-center flex items-center justify-center">
+                                <p className="text-xs text-muted-foreground">Ingresa el tipo de cambio para ver el costo total real.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         )}
