@@ -6,7 +6,7 @@ import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Plus, Route, Loader2, User, Filter } from 'lucide-react';
+import { Plus, Route, Loader2, User, Filter, Calculator } from 'lucide-react';
 import AddTripDialog from '@/components/dashboard/add-trip-dialog';
 import ActiveTrips from '@/components/trips/active-trips';
 import CompletedTrips from '@/components/trips/completed-trips';
@@ -15,6 +15,7 @@ import type { DateRange } from 'react-day-picker';
 import { startOfDay, endOfDay } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import TripCalculatorDialog from '@/components/trips/trip-calculator-dialog';
 
 export default function TripsPage() {
   const { selectedVehicle: vehicle } = useVehicles();
@@ -113,12 +114,18 @@ export default function TripsPage() {
             <p className="text-muted-foreground">Registra y analiza tus viajes de trabajo, vacaciones y más.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
-          <AddTripDialog vehicleId={vehicle.id} lastOdometer={lastOdometer}>
-            <Button>
-              <Plus className="-ml-1 mr-2 h-4 w-4" />
-              Iniciar Viaje
-            </Button>
-          </AddTripDialog>
+            <TripCalculatorDialog allFuelLogs={fuelLogs || []}>
+                <Button variant="outline">
+                    <Calculator className="-ml-1 mr-2 h-4 w-4" />
+                    Calcular Viaje
+                </Button>
+            </TripCalculatorDialog>
+            <AddTripDialog vehicleId={vehicle.id} lastOdometer={lastOdometer}>
+                <Button>
+                <Plus className="-ml-1 mr-2 h-4 w-4" />
+                Iniciar Viaje
+                </Button>
+            </AddTripDialog>
         </div>
       </div>
       
