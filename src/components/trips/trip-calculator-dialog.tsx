@@ -146,122 +146,121 @@ export default function TripCalculatorDialog({ children, allFuelLogs }: TripCalc
             Estima el costo de un viaje ingresando la distancia y otros gastos.
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-             <div className="space-y-4">
-                <FormField
-                    control={form.control}
-                    name="kilometers"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Distancia a Recorrer (Km)</FormLabel>
-                        <FormControl>
-                            <Input type="number" placeholder="Ej: 350" {...field} value={field.value ?? ''} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="otherExpenses"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Otros Gastos (ARS - Opcional)</FormLabel>
-                        <FormControl>
-                            <Input type="text" placeholder="Ej: Peajes, estacionamiento" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-
-                <div className="space-y-2">
-                    <FormLabel>Tipo de Cambio (Opcional)</FormLabel>
-                    <div className="flex items-center gap-2">
-                        <Input 
-                            type="text" 
-                            placeholder="... o ingresa un valor"
-                            value={exchangeRate !== null ? exchangeRate.toLocaleString('es-AR') : ''}
-                            onChange={(e) => setExchangeRate(parseCurrency(e.target.value))}
-                            className="h-9"
-                        />
-                        <Button type="button" onClick={handleFetchRate} disabled={isFetchingRate} variant="outline" size="icon">
-                            {isFetchingRate ? <Loader2 className="h-4 w-4 animate-spin"/> : <Wand2 className="h-4 w-4" />}
-                            <span className="sr-only">Obtener tipo de cambio</span>
-                        </Button>
-                    </div>
-                    <FormDescription className="text-xs">Para calcular el costo total real del vehículo.</FormDescription>
-                </div>
-            </div>
-
-            <DialogFooter className="pt-4 border-t !mt-6 !flex-row !justify-between">
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cerrar</Button>
-                <Button type="submit">
-                    <Calculator className="mr-2 h-4 w-4" /> Calcular
-                </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-
-        {calculationResult && (
-            <div className="space-y-4 pt-4 border-t">
-                <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Resultado de la Estimación</h3>
-                
+        <div className="max-h-[65vh] overflow-y-auto pr-4 pl-1 -mr-4 -ml-1">
+            <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div className="space-y-4">
-                    {/* Fuel Cost Breakdown */}
-                    <div className="p-3 rounded-lg bg-muted/30 space-y-2">
-                        <p className="font-semibold text-sm flex items-center gap-2"><Fuel className="h-4 w-4"/>Costos de Combustible</p>
-                        <div className="flex justify-between items-baseline text-sm">
-                            <span className="text-muted-foreground">Costo/km:</span>
-                            <span className="font-medium">{formatCurrency(calculationResult.fuelCostPerKm)}</span>
-                        </div>
-                        <div className="flex justify-between items-baseline text-sm">
-                            <span className="text-muted-foreground">Total ({calculationResult.kmTraveled.toLocaleString()} km):</span>
-                            <span className="font-medium">{formatCurrency(calculationResult.fuelCostForTrip)}</span>
-                        </div>
-                    </div>
+                    <FormField
+                        control={form.control}
+                        name="kilometers"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Distancia a Recorrer (Km)</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="Ej: 350" {...field} value={field.value ?? ''} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="otherExpenses"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Otros Gastos (ARS - Opcional)</FormLabel>
+                            <FormControl>
+                                <Input type="text" placeholder="Ej: Peajes, estacionamiento" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
 
-                    {/* Total Vehicle Cost Breakdown */}
-                    {calculationResult.totalVehicleCostPerKm !== null && (
+                    <div className="space-y-2">
+                        <FormLabel>Tipo de Cambio (Opcional)</FormLabel>
+                        <div className="flex items-center gap-2">
+                            <Input 
+                                type="text" 
+                                placeholder="... o ingresa un valor"
+                                value={exchangeRate !== null ? exchangeRate.toLocaleString('es-AR') : ''}
+                                onChange={(e) => setExchangeRate(parseCurrency(e.target.value))}
+                                className="h-9"
+                            />
+                            <Button type="button" onClick={handleFetchRate} disabled={isFetchingRate} variant="outline" size="icon">
+                                {isFetchingRate ? <Loader2 className="h-4 w-4 animate-spin"/> : <Wand2 className="h-4 w-4" />}
+                                <span className="sr-only">Obtener tipo de cambio</span>
+                            </Button>
+                        </div>
+                        <FormDescription className="text-xs">Para calcular el costo total real del vehículo.</FormDescription>
+                    </div>
+                </div>
+
+                <DialogFooter className="pt-4 border-t !mt-6 !flex-row !justify-between">
+                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cerrar</Button>
+                    <Button type="submit">
+                        <Calculator className="mr-2 h-4 w-4" /> Calcular
+                    </Button>
+                </DialogFooter>
+            </form>
+            </Form>
+
+            {calculationResult && (
+                <div className="space-y-4 pt-4 border-t">
+                    <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Resultado de la Estimación</h3>
+                    
+                    <div className="space-y-4">
                         <div className="p-3 rounded-lg bg-muted/30 space-y-2">
-                            <p className="font-semibold text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4"/>Costo Total del Vehículo</p>
+                            <p className="font-semibold text-sm flex items-center gap-2"><Fuel className="h-4 w-4"/>Costos de Combustible</p>
                             <div className="flex justify-between items-baseline text-sm">
-                                <span className="text-muted-foreground">Costo/km Real:</span>
-                                <span className="font-medium">{formatCurrency(calculationResult.totalVehicleCostPerKm)}</span>
+                                <span className="text-muted-foreground">Costo/km:</span>
+                                <span className="font-medium">{formatCurrency(calculationResult.fuelCostPerKm)}</span>
                             </div>
                             <div className="flex justify-between items-baseline text-sm">
                                 <span className="text-muted-foreground">Total ({calculationResult.kmTraveled.toLocaleString()} km):</span>
-                                <span className="font-medium">{formatCurrency(calculationResult.totalVehicleCostForTrip!)}</span>
+                                <span className="font-medium">{formatCurrency(calculationResult.fuelCostForTrip)}</span>
                             </div>
                         </div>
-                    )}
-                </div>
 
-                <Separator />
-                
-                {/* Final Trip Costs including other expenses */}
-                <div className="space-y-4">
-                    <p className="font-semibold text-sm">Costo Final Estimado del Viaje</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-3 rounded-lg border">
-                            <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Wallet className="h-3 w-3" />Combustible + Otros Gastos</p>
-                            <p className="font-semibold text-lg">{formatCurrency(calculationResult.finalFuelCost)}</p>
-                        </div>
-                        {calculationResult.finalTotalCost !== null ? (
-                            <div className="p-3 rounded-lg border border-primary/50 bg-primary/10">
-                                <p className="text-xs text-primary/80 flex items-center gap-1.5"><DollarSign className="h-3 w-3" />Costo Total Real del Viaje</p>
-                                <p className="font-semibold text-lg text-primary">{formatCurrency(calculationResult.finalTotalCost)}</p>
-                            </div>
-                        ) : (
-                            <div className="p-3 rounded-lg border border-dashed text-center flex items-center justify-center">
-                                <p className="text-xs text-muted-foreground">Ingresa el tipo de cambio para ver el costo total real.</p>
+                        {calculationResult.totalVehicleCostPerKm !== null && (
+                            <div className="p-3 rounded-lg bg-muted/30 space-y-2">
+                                <p className="font-semibold text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4"/>Costo Total del Vehículo</p>
+                                <div className="flex justify-between items-baseline text-sm">
+                                    <span className="text-muted-foreground">Costo/km Real:</span>
+                                    <span className="font-medium">{formatCurrency(calculationResult.totalVehicleCostPerKm)}</span>
+                                </div>
+                                <div className="flex justify-between items-baseline text-sm">
+                                    <span className="text-muted-foreground">Total ({calculationResult.kmTraveled.toLocaleString()} km):</span>
+                                    <span className="font-medium">{formatCurrency(calculationResult.totalVehicleCostForTrip!)}</span>
+                                </div>
                             </div>
                         )}
                     </div>
+
+                    <Separator />
+                    
+                    <div className="space-y-4">
+                        <p className="font-semibold text-sm">Costo Final Estimado del Viaje</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-3 rounded-lg border">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Wallet className="h-3 w-3" />Combustible + Otros Gastos</p>
+                                <p className="font-semibold text-lg">{formatCurrency(calculationResult.finalFuelCost)}</p>
+                            </div>
+                            {calculationResult.finalTotalCost !== null ? (
+                                <div className="p-3 rounded-lg border border-primary/50 bg-primary/10">
+                                    <p className="text-xs text-primary/80 flex items-center gap-1.5"><DollarSign className="h-3 w-3" />Costo Total Real del Viaje</p>
+                                    <p className="font-semibold text-lg text-primary">{formatCurrency(calculationResult.finalTotalCost)}</p>
+                                </div>
+                            ) : (
+                                <div className="p-3 rounded-lg border border-dashed text-center flex items-center justify-center">
+                                    <p className="text-xs text-muted-foreground">Ingresa el tipo de cambio para ver el costo total real.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
-            </div>
-        )}
+            )}
+        </div>
       </DialogContent>
     </Dialog>
   );
