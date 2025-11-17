@@ -3,17 +3,17 @@
 import type { Trip, ProcessedFuelLog, Vehicle, TripExpense } from '@/lib/types';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Map, Edit, Trash2, Clock, Droplets, Wallet, Route, CircleDollarSign, User, Wand2, Loader2 } from 'lucide-react';
+import { Map, Edit, Trash2, Clock, Droplets, Wallet, Route, CircleDollarSign, User, Wand2, Loader2, TrendingUp } from 'lucide-react';
 import { formatDateTime, formatCurrency } from '@/lib/utils';
 import AddTripDialog from '../dashboard/add-trip-dialog';
 import { Button } from '../ui/button';
 import { useMemo, useState } from 'react';
 import { differenceInHours, differenceInMinutes } from 'date-fns';
-import { usePreferences } from '@/context/preferences-context';
 import DeleteTripDialog from './delete-trip-dialog';
 import { calculateCostsPerKm, calculateTotalCostInARS } from '@/lib/cost-calculator';
 import { getDolarBlueRate } from '@/ai/flows/get-exchange-rate';
 import { useToast } from '@/hooks/use-toast';
+import { Separator } from '../ui/separator';
 
 interface TripDetailsProps {
     trip: Trip;
@@ -56,15 +56,16 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
         const lastPricePerLiter = lastFuelLog?.pricePerLiter || 0;
         
         const costsPerKm = calculateCostsPerKm(vehicle, fallbackConsumption, lastPricePerLiter);
-        const totalCostPerKmInARS = exchangeRate ? calculateTotalCostInARS(costsPerKm, exchangeRate) : null;
-        const fuelCostPerKmInARS = costsPerKm.fuelCostPerKm;
+        
+        const fuelCostPerKm_ARS = costsPerKm.fuelCostPerKm;
+        const totalVehicleCostPerKm_ARS = exchangeRate ? calculateTotalCostInARS(costsPerKm, exchangeRate) : null;
 
         if (!trip.endOdometer || !trip.startOdometer) {
-            return { kmTraveled: 0, duration: "N/A", otherExpenses: 0, realTotalCost: null, realFuelCost: null };
+            return { kmTraveled: 0, duration: "N/A", otherExpenses: 0, fuelCostPerKm_ARS, totalVehicleCostPerKm_ARS };
         }
         const kmTraveled = trip.endOdometer - trip.startOdometer;
-        if (kmTraveled <= 0) {
-            return { kmTraveled: 0, duration: "N/A", otherExpenses: 0, realTotalCost: null, realFuelCost: null };
+        if (kmTraveled < 0) {
+             return { kmTraveled: 0, duration: "N/A", otherExpenses: 0, fuelCostPerKm_ARS, totalVehicleCostPerKm_ARS };
         }
         
         const otherExpenses = (trip.expenses || []).reduce((acc, expense) => acc + expense.amount, 0);
@@ -80,16 +81,25 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
             kmTraveled,
             duration,
             otherExpenses,
-            realTotalCost: totalCostPerKmInARS ? (kmTraveled * totalCostPerKmInARS) + otherExpenses : null,
-            realFuelCost: (kmTraveled * fuelCostPerKmInARS) + otherExpenses,
+            fuelCostPerKm_ARS,
+            totalVehicleCostPerKm_ARS,
         }
     }, [trip, vehicle, allFuelLogs, exchangeRate, lastFuelLog]);
 
-    const { kmTraveled, duration, otherExpenses, realTotalCost, realFuelCost } = tripCalculations;
+    const { kmTraveled, duration, otherExpenses, fuelCostPerKm_ARS, totalVehicleCostPerKm_ARS } = tripCalculations;
+    
     const lastOdometer = trip.endOdometer || 0;
+    
+    const fuelCostForTrip = kmTraveled * fuelCostPerKm_ARS;
+    const totalVehicleCostForTrip = totalVehicleCostPerKm_ARS ? kmTraveled * totalVehicleCostPerKm_ARS : null;
+    
+    const fuelCostPlusExpenses = fuelCostForTrip + otherExpenses;
+    const totalRealCostOfTrip = totalVehicleCostForTrip ? totalVehicleCostForTrip + otherExpenses : null;
+
 
     return (
-        <div className="space-y-3 pt-4 border-t pl-12">
+        <div className="space-y-4 pt-4 border-t pl-12">
+            {/* Basic Trip Info */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-6 text-sm">
                  <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
@@ -115,6 +125,8 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
                     </div>
                 )}
             </div>
+            
+            {/* Notes and Expenses details */}
              {trip.notes && (
                 <div className="pt-2 text-sm">
                     <p className="font-medium">Notas:</p>
@@ -135,6 +147,7 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
                 </div>
             )}
             
+            {/* Cost Calculation Section */}
             <div className="pt-4 border-t space-y-4">
                 <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
                     <Button onClick={handleFetchRate} disabled={isFetchingRate} variant="outline" size="sm">
@@ -144,21 +157,61 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
                     {exchangeRate && <p className="text-xs text-muted-foreground">Usando cambio 1 USD = {formatCurrency(exchangeRate)} ARS</p>}
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4 text-sm rounded-lg bg-muted/50 p-3">
-                    <div>
-                        <p className="font-semibold text-base">{realFuelCost !== null ? formatCurrency(realFuelCost) : 'N/A'}</p>
-                        <p className="text-xs text-muted-foreground">Costo Combustible + Gastos</p>
-                    </div>
-                    {realTotalCost !== null && (
-                        <div>
-                            <p className="font-semibold text-base">{formatCurrency(realTotalCost)}</p>
-                            <p className="text-xs text-muted-foreground">Costo Total Real del Viaje</p>
+                {exchangeRate && (
+                    <div className="space-y-4">
+                        {/* Fuel Cost Breakdown */}
+                        <div className="p-3 rounded-lg bg-muted/30">
+                            <p className="font-semibold text-sm mb-2 flex items-center gap-2"><Droplets className="h-4 w-4"/>Costos de Combustible</p>
+                             <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p className="font-medium">{formatCurrency(fuelCostPerKm_ARS)}</p>
+                                    <p className="text-xs text-muted-foreground">Costo/km</p>
+                                </div>
+                                <div>
+                                    <p className="font-medium">{formatCurrency(fuelCostForTrip)}</p>
+                                    <p className="text-xs text-muted-foreground">Total para {kmTraveled.toLocaleString()} km</p>
+                                </div>
+                            </div>
                         </div>
-                    )}
-                </div>
+
+                        {/* Total Vehicle Cost Breakdown */}
+                        {totalVehicleCostPerKm_ARS !== null && (
+                            <div className="p-3 rounded-lg bg-muted/30">
+                                <p className="font-semibold text-sm mb-2 flex items-center gap-2"><TrendingUp className="h-4 w-4"/>Costo Total del Vehículo</p>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <p className="font-medium">{formatCurrency(totalVehicleCostPerKm_ARS)}</p>
+                                        <p className="text-xs text-muted-foreground">Costo/km Real</p>
+                                    </div>
+                                    <div>
+                                        <p className="font-medium">{formatCurrency(totalVehicleCostForTrip!)}</p>
+                                        <p className="text-xs text-muted-foreground">Total para {kmTraveled.toLocaleString()} km</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        <Separator />
+
+                        {/* Final Trip Costs including other expenses */}
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <p className="font-semibold text-base">{formatCurrency(fuelCostPlusExpenses)}</p>
+                                <p className="text-xs text-muted-foreground">Combustible + Otros Gastos</p>
+                            </div>
+                            {totalRealCostOfTrip !== null && (
+                                <div>
+                                    <p className="font-semibold text-base text-primary">{formatCurrency(totalRealCostOfTrip)}</p>
+                                    <p className="text-xs text-muted-foreground">Costo Total Real del Viaje</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
-             <div className="flex gap-2 pt-4">
+            {/* Action Buttons */}
+             <div className="flex gap-2 pt-4 border-t">
                 <AddTripDialog vehicleId={trip.vehicleId} trip={trip} lastOdometer={lastOdometer}>
                     <Button variant="outline" size="sm" className="w-full">
                         <Edit className="h-4 w-4 mr-1" /> Ver/Editar
