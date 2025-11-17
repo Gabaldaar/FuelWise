@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -210,8 +211,15 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
     const fuelLogRef = doc(firestore, 'vehicles', vehicleId, 'fuel_records', logId);
 
     const totalCostNum = parseCurrency(values.totalCost);
+    const pricePerLiterNum = parseCurrency(values.pricePerLiter);
     const exchangeRateNum = values.exchangeRate ? parseCurrency(values.exchangeRate) : 0;
-    const totalCostUsd = exchangeRateNum > 0 ? totalCostNum / exchangeRateNum : undefined;
+
+    let totalCostUsd: number | undefined;
+    let pricePerLiterUsd: number | undefined;
+    if (exchangeRateNum > 0) {
+        totalCostUsd = totalCostNum / exchangeRateNum;
+        pricePerLiterUsd = pricePerLiterNum / exchangeRateNum;
+    }
 
     const fuelLogData = {
         ...values,
@@ -223,9 +231,10 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
         gasStation: values.gasStation || '',
         totalCost: totalCostNum,
         liters: parseCurrency(values.liters),
-        pricePerLiter: parseCurrency(values.pricePerLiter),
+        pricePerLiter: pricePerLiterNum,
         exchangeRate: exchangeRateNum > 0 ? exchangeRateNum : undefined,
-        totalCostUsd: totalCostUsd,
+        totalCostUsd,
+        pricePerLiterUsd,
     };
 
     setDocumentNonBlocking(fuelLogRef, fuelLogData, { merge: true });

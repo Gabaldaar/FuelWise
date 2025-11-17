@@ -34,6 +34,7 @@ export type FuelLog = {
   odometer: number;
   fuelType: string;
   pricePerLiter: number;
+  pricePerLiterUsd?: number;
   totalCost: number;
   totalCostUsd?: number;
   exchangeRate?: number;

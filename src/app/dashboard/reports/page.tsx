@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -5,9 +6,7 @@ import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import type { ProcessedFuelLog, ServiceReminder, Vehicle } from '@/lib/types';
-import { DateRange } from 'react-day-picker';
-import { subDays, startOfDay, endOfDay, getYear, getMonth } from 'date-fns';
-import { DateRangePicker } from '@/components/reports/date-range-picker';
+import { getYear, getMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Car, Fuel, Wrench, Gauge, Calendar, DollarSign, Route, TrendingUp, Droplets, AlertTriangle, Loader2 } from 'lucide-react';
 import { ReportStatCard } from '@/components/reports/report-stat-card';
@@ -20,6 +19,7 @@ import { formatCurrency } from '@/lib/utils';
 import { getDolarBlueRate } from '@/ai/flows/get-exchange-rate';
 import { calculateCostsPerKm, calculateTotalCostInARS } from '@/lib/cost-calculator';
 import { useToast } from '@/hooks/use-toast';
+import { Separator } from '@/components/ui/separator';
 
 
 function processFuelLogs(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
@@ -106,17 +106,21 @@ export default function ReportsPage() {
 
   }, [vehicle, allFuelLogsData, allServicesData, exchangeRate]);
 
-  const { availableYears, annualData, logsForSelectedYear } = useMemo(() => {
-    if (!allFuelLogsData || !allServicesData) return { availableYears: [], annualData: null, logsForSelectedYear: [] };
+  const { availableYears, annualData, logsForSelectedYear, annualStats } = useMemo(() => {
+    if (!allFuelLogsData || !allServicesData) return { availableYears: [], annualData: null, logsForSelectedYear: [], annualStats: null };
     
     const years = new Set<string>();
     allFuelLogsData.forEach(log => years.add(String(getYear(new Date(log.date)))));
+    allServicesData.forEach(service => {
+        if(service.completedDate) years.add(String(getYear(new Date(service.completedDate))))
+    });
     const sortedYears = Array.from(years).sort((a, b) => parseInt(b) - parseInt(a));
     
     const year = parseInt(selectedYear);
     
     const logsInYear = processFuelLogs(allFuelLogsData.filter(log => getYear(new Date(log.date)) === year));
-    
+    const servicesInYear = allServicesData.filter(service => service.isCompleted && service.completedDate && getYear(new Date(service.completedDate)) === year);
+
     const monthlyData = Array.from({ length: 12 }, (_, i) => ({
       name: new Date(year, i).toLocaleString('es-ES', { month: 'short' }),
       combustible: 0,
@@ -131,9 +135,7 @@ export default function ReportsPage() {
       monthlyData[month].combustible += log.totalCost;
     });
 
-    allServicesData
-      ?.filter(service => service.isCompleted && service.completedDate && getYear(new Date(service.completedDate)) === year)
-      .forEach(service => {
+    servicesInYear.forEach(service => {
         const month = getMonth(new Date(service.completedDate!));
         monthlyData[month].servicios += service.cost || 0;
       });
@@ -145,13 +147,27 @@ export default function ReportsPage() {
             const firstOdo = logsInMonth[0].odometer;
             const lastOdo = logsInMonth[logsInMonth.length - 1].odometer;
             monthlyData[i].km = lastOdo - firstOdo;
+        } else if (logsInMonth.length === 1) {
+            monthlyData[i].km = logsInMonth[0].distanceTraveled || 0;
         }
     }
 
 
     monthlyData.forEach(month => month.total = month.combustible + month.servicios);
+    
+    const totalKm = monthlyData.reduce((acc, data) => acc + data.km, 0);
+    const totalFuelCost = monthlyData.reduce((acc, data) => acc + data.combustible, 0);
+    const totalServicesCost = monthlyData.reduce((acc, data) => acc + data.servicios, 0);
+    const totalAnnualCost = totalFuelCost + totalServicesCost;
 
-    return { availableYears: sortedYears, annualData: monthlyData, logsForSelectedYear: logsInYear };
+    const stats = {
+        totalKm,
+        totalFuelCost,
+        totalServicesCost,
+        totalAnnualCost
+    }
+
+    return { availableYears: sortedYears, annualData: monthlyData, logsForSelectedYear: logsInYear, annualStats: stats };
   }, [allFuelLogsData, allServicesData, selectedYear]);
 
   useEffect(() => {
@@ -213,6 +229,15 @@ export default function ReportsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <ReportStatCard variant="small" title="Km Recorridos" value={annualStats?.totalKm.toLocaleString() + ' km' ?? '0 km'} />
+                        <ReportStatCard variant="small" title="Gasto Combustible" value={formatCurrency(annualStats?.totalFuelCost ?? 0)} />
+                        <ReportStatCard variant="small" title="Gasto Servicios" value={formatCurrency(annualStats?.totalServicesCost ?? 0)} />
+                        <ReportStatCard variant="small" title="Gasto Total (ARS)" value={formatCurrency(annualStats?.totalAnnualCost ?? 0)} />
+                     </div>
+
+                    <Separator />
+
                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <MonthlyCostsChart data={annualData} />
                         <MonthlyDistanceChart data={annualData} />
@@ -221,22 +246,31 @@ export default function ReportsPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <FuelConsumptionChart data={logsForSelectedYear} />
                         <EvolutionChart 
-                        title="Evolución del Consumo (Rendimiento)" 
-                        data={logsForSelectedYear.filter(log => log.consumption && log.consumption > 0)}
-                        dataKey="date"
-                        valueKey="consumption"
-                        valueFormatter={(val) => `${val.toFixed(2)} km/L`}
-                        tooltipLabel="Rendimiento"
-                        icon={TrendingUp}
+                            title="Evolución del Consumo (Rendimiento)" 
+                            data={logsForSelectedYear.filter(log => log.consumption && log.consumption > 0)}
+                            dataKey="date"
+                            valueKey="consumption"
+                            valueFormatter={(val) => `${val.toFixed(2)} km/L`}
+                            tooltipLabel="Rendimiento"
+                            icon={TrendingUp}
                         />
                          <EvolutionChart 
-                        title="Evolución del Precio del Combustible" 
-                        data={logsForSelectedYear}
-                        dataKey="date"
-                        valueKey="pricePerLiter"
-                        valueFormatter={(val) => `${formatCurrency(val)} / L`}
-                        tooltipLabel="Precio/L"
-                        icon={Droplets}
+                            title="Evolución del Precio del Combustible (ARS)" 
+                            data={logsForSelectedYear}
+                            dataKey="date"
+                            valueKey="pricePerLiter"
+                            valueFormatter={(val) => `${formatCurrency(val)} / L`}
+                            tooltipLabel="Precio/L (ARS)"
+                            icon={Droplets}
+                        />
+                        <EvolutionChart 
+                            title="Evolución del Precio del Combustible (USD)" 
+                            data={logsForSelectedYear.filter(log => log.pricePerLiterUsd && log.pricePerLiterUsd > 0)}
+                            dataKey="date"
+                            valueKey="pricePerLiterUsd"
+                            valueFormatter={(val) => `${formatCurrency(val, 'USD')} / L`}
+                            tooltipLabel="Precio/L (USD)"
+                            icon={DollarSign}
                         />
                     </div>
                 </CardContent>
