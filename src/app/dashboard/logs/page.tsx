@@ -10,11 +10,11 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { collection, query, orderBy } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, Gauge, Droplets, Tag, Building, User as UserIcon, Plus, Fuel, AlertTriangle, Loader2, Briefcase } from 'lucide-react';
+import { Edit, Trash2, Gauge, Droplets, Tag, Building, User as UserIcon, Plus, Fuel, AlertTriangle, Loader2, Briefcase, Sigma } from 'lucide-react';
 import DeleteFuelLogDialog from '@/components/dashboard/delete-fuel-log-dialog';
 import { usePreferences } from '@/context/preferences-context';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import type { DateRange } from 'react-day-picker';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
@@ -115,6 +115,20 @@ export default function LogsPage() {
 
   }, [processedLogs, dateRange, logTypeFilter]);
 
+  const totals = useMemo(() => {
+    if (!filteredLogs || filteredLogs.length === 0) {
+      return { totalLiters: 0, totalCost: 0 };
+    }
+    return filteredLogs.reduce(
+      (acc, log) => {
+        acc.totalLiters += log.liters;
+        acc.totalCost += log.totalCost;
+        return acc;
+      },
+      { totalLiters: 0, totalCost: 0 }
+    );
+  }, [filteredLogs]);
+
   const avgConsumption = useMemo(() => {
     if (!vehicle || !allFuelLogs) return 0;
     const consumptionLogs = processFuelLogs(allFuelLogs).filter(log => log.consumption && log.consumption > 0);
@@ -171,7 +185,31 @@ export default function LogsPage() {
             </CardContent>
         </Card>
         
-        <EstimatedRefuelCard vehicle={vehicleWithAvgConsumption} allFuelLogs={allFuelLogs || []} />
+        <Card>
+            <CardHeader>
+                <CardTitle className="font-headline flex items-center gap-2 text-xl">
+                    <Sigma /> Resumen de Registros Filtrados
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pb-4 text-sm">
+                    <div className="flex items-center gap-2">
+                        <Droplets className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                            <p className="font-semibold text-lg">{totals.totalLiters.toFixed(2)} L</p>
+                            <p className="text-xs text-muted-foreground">Litros Totales</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <UserIcon className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                            <p className="font-semibold text-lg">{formatCurrency(totals.totalCost)}</p>
+                            <p className="text-xs text-muted-foreground">Costo Total</p>
+                        </div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
 
         {isLoading ? (
              <div className="h-64 text-center flex flex-col items-center justify-center">
