@@ -4,6 +4,7 @@
  */
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import nodeFetch from 'node-fetch';
 
 const ExchangeRateApiResponseSchema = z.object({
   compra: z.number().describe('The buying price of the official Dolar.'),
@@ -23,13 +24,13 @@ export type ExchangeRateOutput = z.infer<typeof ExchangeRateOutputSchema>;
 export async function getOfficialDolarRate(): Promise<ExchangeRateOutput> {
   try {
     // IMPORTANT: This API always returns the CURRENT day's exchange rate. It does not support historical lookups.
-    const response = await fetch('https://dolarapi.com/v1/dolares/oficial', {
-      cache: 'no-store', // This is crucial to allow the server action to make external API calls in some Next.js environments.
+    const response = await nodeFetch('https://dolarapi.com/v1/dolares/oficial', {
       headers: {
         // Add a user-agent to mimic a browser request, which can prevent some fetch errors.
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
       }
     });
+
     if (!response.ok) {
       throw new Error(`Failed to fetch exchange rate. Status: ${response.status}`);
     }
