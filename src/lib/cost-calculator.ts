@@ -1,14 +1,14 @@
 import type { Vehicle } from './types';
 
-export interface CostPerKm {
-  amortizationPerKm: number; // USD per Km
-  fixedCostPerKm: number; // USD per Km
-  fuelCostPerKm: number; // ARS per Km
+export interface CostPerKmUSD {
+  fixedCostPerKm: number;      // Amortization + Patent + Insurance (USD/km)
+  variableCostPerKm: number;   // Maintenance + Tires (USD/km)
 }
 
 export interface DetailedCostsARS {
   fuelCostPerKm_ARS: number;
-  vehicleCostPerKm_ARS: number; // Amortization + Fixed Costs in ARS
+  fixedCostPerKm_ARS: number;
+  variableCostPerKm_ARS: number;
   totalCostPerKm_ARS: number;
 }
 
@@ -25,27 +25,13 @@ export function calculateCostsPerKm(
   vehicle: Vehicle,
   averageConsumptionKmPerLiter: number,
   currentFuelPrice: number
-): CostPerKm {
+): { costPerKmUSD: CostPerKmUSD, fuelCostPerKmARS: number } {
   
-  // 1. Amortización del vehículo por Km (Am/Km) in USD
-  let amortizationPerKm = 0;
   const {
     purchasePrice = 0,
     resaleValue = 0,
     kmPerYear = 0,
     usefulLifeYears = 0,
-  } = vehicle;
-
-  if (purchasePrice > 0 && kmPerYear > 0 && usefulLifeYears > 0) {
-    const totalKmAmortization = kmPerYear * usefulLifeYears;
-    if (totalKmAmortization > 0) {
-        amortizationPerKm = (purchasePrice - resaleValue) / totalKmAmortization;
-    }
-  }
-
-  // 2. Costo Fijo por kilometro (CF/Km) in USD
-  let fixedCostPerKm = 0;
-  const {
     annualInsuranceCost = 0,
     annualPatentCost = 0,
     maintenanceCost = 0,
@@ -53,26 +39,39 @@ export function calculateCostsPerKm(
     tiresCost = 0,
     tiresKm = 0,
   } = vehicle;
+
+  // 1. Amortización del vehículo por Km (Am/Km) in USD
+  let amortizationPerKm = 0;
+  if (purchasePrice > 0 && kmPerYear > 0 && usefulLifeYears > 0) {
+    const totalKmAmortization = kmPerYear * usefulLifeYears;
+    if (totalKmAmortization > 0) {
+        amortizationPerKm = (purchasePrice - resaleValue) / totalKmAmortization;
+    }
+  }
   
+  // 2. Costos Fijos (CF) in USD/km
   const insurancePerKm = kmPerYear > 0 ? annualInsuranceCost / kmPerYear : 0;
   const patentPerKm = kmPerYear > 0 ? annualPatentCost / kmPerYear : 0;
+  const fixedCostPerKm = amortizationPerKm + insurancePerKm + patentPerKm;
+
+  // 3. Costos Variables (CV) in USD/km
   const maintenancePerKm = maintenanceKm > 0 ? maintenanceCost / maintenanceKm : 0;
   const tiresPerKm = tiresKm > 0 ? tiresCost / tiresKm : 0;
+  const variableCostPerKm = maintenancePerKm + tiresPerKm;
 
-  fixedCostPerKm = insurancePerKm + patentPerKm + maintenancePerKm + tiresPerKm;
-
-  // 3. Costo de combustible por kilómetro (CC/Km) in ARS
-  let fuelCostPerKm = 0;
+  // 4. Costo de combustible por kilómetro (CC) in ARS/km
+  let fuelCostPerKmARS = 0;
   if (averageConsumptionKmPerLiter > 0 && currentFuelPrice > 0) {
-    // Rendimiento en L/km es el inverso de km/L
     const litersPerKm = 1 / averageConsumptionKmPerLiter;
-    fuelCostPerKm = litersPerKm * currentFuelPrice;
+    fuelCostPerKmARS = litersPerKm * currentFuelPrice;
   }
 
   return {
-    amortizationPerKm,
-    fixedCostPerKm,
-    fuelCostPerKm,
+    costPerKmUSD: {
+      fixedCostPerKm,
+      variableCostPerKm
+    },
+    fuelCostPerKmARS,
   };
 }
 
@@ -82,24 +81,30 @@ export function calculateCostsPerKm(
  * @param exchangeRate - The current USD to ARS exchange rate.
  * @returns The total cost per kilometer in ARS.
  */
-export function calculateTotalCostInARS(costs: CostPerKm, exchangeRate: number): DetailedCostsARS {
-    const fuelCostPerKm_ARS = costs.fuelCostPerKm;
+export function calculateTotalCostInARS(
+    costPerKmUSD: CostPerKmUSD, 
+    fuelCostPerKmARS: number, 
+    exchangeRate: number | null
+): DetailedCostsARS {
 
-    if (exchangeRate <= 0) {
+    if (!exchangeRate || exchangeRate <= 0) {
       return {
-        fuelCostPerKm_ARS,
-        vehicleCostPerKm_ARS: 0,
-        totalCostPerKm_ARS: fuelCostPerKm_ARS,
+        fuelCostPerKm_ARS: fuelCostPerKmARS,
+        fixedCostPerKm_ARS: 0,
+        variableCostPerKm_ARS: 0,
+        totalCostPerKm_ARS: fuelCostPerKmARS,
       }
     };
 
-    const amortizationInARS = costs.amortizationPerKm * exchangeRate;
-    const fixedCostInARS = costs.fixedCostPerKm * exchangeRate;
-    const vehicleCostPerKm_ARS = amortizationInARS + fixedCostInARS;
+    const fixedCostPerKm_ARS = costPerKmUSD.fixedCostPerKm * exchangeRate;
+    const variableCostPerKm_ARS = costPerKmUSD.variableCostPerKm * exchangeRate;
+    
+    const totalCostPerKm_ARS = fixedCostPerKm_ARS + variableCostPerKm_ARS + fuelCostPerKmARS;
     
     return {
-      fuelCostPerKm_ARS,
-      vehicleCostPerKm_ARS,
-      totalCostPerKm_ARS: vehicleCostPerKm_ARS + fuelCostPerKm_ARS,
+      fuelCostPerKm_ARS: fuelCostPerKmARS,
+      fixedCostPerKm_ARS: fixedCostPerKm_ARS,
+      variableCostPerKm_ARS: variableCostPerKm_ARS,
+      totalCostPerKm_ARS,
     }
 }

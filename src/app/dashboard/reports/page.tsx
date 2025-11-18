@@ -89,19 +89,21 @@ export default function ReportsPage() {
   }, [toast]);
 
   const costPerKmData = useMemo(() => {
-    if (!vehicle || !allFuelLogsData || !allServicesData) return null;
+    if (!vehicle || !allFuelLogsData) return null;
     
     const lastFuelLog = allFuelLogsData.length > 0 ? allFuelLogsData[allFuelLogsData.length - 1] : null;
     const avgConsumption = vehicle.averageConsumptionKmPerLiter || 0;
     const lastFuelPrice = lastFuelLog?.pricePerLiter || 0;
 
-    const costsPerKm = calculateCostsPerKm(vehicle, avgConsumption, lastFuelPrice);
-    const detailedCostsARS = exchangeRate ? calculateTotalCostInARS(costsPerKm, exchangeRate) : null;
+    const { costPerKmUSD, fuelCostPerKmARS } = calculateCostsPerKm(vehicle, avgConsumption, lastFuelPrice);
+    const detailedCostsARS = calculateTotalCostInARS(costPerKmUSD, fuelCostPerKmARS, exchangeRate);
 
     return {
-        fuelCostPerKm: detailedCostsARS?.fuelCostPerKm_ARS || 0,
-        totalCostPerKm: detailedCostsARS?.totalCostPerKm_ARS,
-    }
+      cf: detailedCostsARS.fixedCostPerKm_ARS,
+      cv: detailedCostsARS.variableCostPerKm_ARS,
+      cc: detailedCostsARS.fuelCostPerKm_ARS,
+      ctr: detailedCostsARS.totalCostPerKm_ARS,
+    };
 
   }, [vehicle, allFuelLogsData, allServicesData, exchangeRate]);
 
@@ -205,11 +207,13 @@ export default function ReportsPage() {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><DollarSign /> Costos por Kilómetro (Global)</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><DollarSign /> Costos por Kilómetro (Global, ARS)</CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <ReportStatCard icon={Fuel} title="Costo Combustible / km (ARS)" value={formatCurrency(costPerKmData?.fuelCostPerKm || 0)} description="Costo variable de combustible por kilómetro."/>
-                   <ReportStatCard icon={Car} title="Costo Total Real / km (ARS)" value={costPerKmData?.totalCostPerKm ? formatCurrency(costPerKmData.totalCostPerKm) : 'N/A'} description="Incluye combustible, amortización y costos fijos."/>
+                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                   <ReportStatCard variant='small' title="C. Fijos (CF)" value={formatCurrency(costPerKmData?.cf || 0)} description="Amortización, seguro, patente."/>
+                   <ReportStatCard variant='small' title="C. Variables (CV)" value={formatCurrency(costPerKmData?.cv || 0)} description="Mantenimiento y neumáticos."/>
+                   <ReportStatCard variant='small' title="C. Combustible (CC)" value={formatCurrency(costPerKmData?.cc || 0)} description="Consumo de combustible."/>
+                   <ReportStatCard variant='small' title="C. Total Real (CTR)" value={costPerKmData?.ctr ? formatCurrency(costPerKmData.ctr) : 'N/A'} description="CF + CV + CC"/>
                 </CardContent>
             </Card>
 
