@@ -13,10 +13,16 @@ export type ExchangeRateOutput = z.infer<typeof ExchangeRateOutputSchema>;
 
 // This is the function we will call directly from our React component.
 export async function getOfficialDolarRate(): Promise<ExchangeRateOutput> {
+  console.log('[DIAGNÓSTICO] Iniciando getOfficialDolarRate...');
   try {
-    const response = await fetch('https://www.dolarsi.com/api/api.php?type=valoresprincipales', { cache: 'no-store' });
+    console.log('[DIAGNÓSTICO] Realizando fetch a dolarsi.com...');
+    const response = await fetch('https://www.dolarsi.com/api/api.php?type=valoresprincipales', { 
+        cache: 'no-store',
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+    });
     
-    // INDICADOR: Imprimir el status de la respuesta SIEMPRE
     console.log('[DIAGNÓSTICO] Status de la respuesta de la API:', response.status);
 
     if (!response.ok) {
@@ -56,8 +62,8 @@ export async function getOfficialDolarRate(): Promise<ExchangeRateOutput> {
         rate: venta
     };
 
-  } catch (error) {
-    console.error('[DIAGNÓSTICO DETALLADO] Error en getOfficialDolarRate:', error);
+  } catch (error: any) {
+    console.error('[DIAGNÓSTICO DETALLADO] Error en getOfficialDolarRate. Nombre:', error.name, 'Mensaje:', error.message, 'Stack:', error.stack);
     throw new Error('No se pudo obtener la cotización del dólar. Revisa la consola del servidor para más detalles.');
   }
 }
