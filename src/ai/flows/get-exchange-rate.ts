@@ -23,7 +23,7 @@ export type ExchangeRateOutput = z.infer<typeof ExchangeRateOutputSchema>;
 // This is the function we will call directly from our React component.
 export async function getOfficialDolarRate(): Promise<ExchangeRateOutput> {
   try {
-    const response = await fetch('https://www.dolarsi.com/api/api.php?type=valoresprincipales');
+    const response = await fetch('https://www.dolarsi.com/api/api.php?type=valoresprincipales', { cache: 'no-store' });
     
     if (!response.ok) {
       throw new Error(`Failed to fetch exchange rate. Status: ${response.status}`);
