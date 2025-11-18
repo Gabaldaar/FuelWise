@@ -84,7 +84,6 @@ export type Trip = {
     endOdometer?: number;
     status: 'active' | 'completed';
     expenses?: TripExpense[];
-    exchangeRate?: number;
 };
 
 export type ProcessedFuelLog = FuelLog & {
