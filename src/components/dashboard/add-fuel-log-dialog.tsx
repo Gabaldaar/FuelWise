@@ -318,24 +318,20 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
                               value={field.value}
                               className="grid grid-cols-2 gap-4"
                             >
-                              <FormItem>
-                                <FormControl>
-                                  <RadioGroupItem value="Particular" id="r1" className="sr-only" />
-                                </FormControl>
-                                <FormLabel htmlFor="r1" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
-                                  <UserIconC className="mb-3 h-6 w-6" />
-                                  Particular
-                                </FormLabel>
-                              </FormItem>
-                              <FormItem>
-                                <FormControl>
-                                  <RadioGroupItem value="Trabajo" id="r2" className="sr-only" />
-                                </FormControl>
-                                <FormLabel htmlFor="r2" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
-                                  <Briefcase className="mb-3 h-6 w-6" />
-                                  Trabajo
-                                </FormLabel>
-                              </FormItem>
+                                <div>
+                                  <RadioGroupItem value="Particular" id="r1" className="peer sr-only" />
+                                  <FormLabel htmlFor="r1" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                    <UserIconC className="mb-3 h-6 w-6" />
+                                    Particular
+                                  </FormLabel>
+                                </div>
+                                <div>
+                                  <RadioGroupItem value="Trabajo" id="r2" className="peer sr-only" />
+                                  <FormLabel htmlFor="r2" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                    <Briefcase className="mb-3 h-6 w-6" />
+                                    Trabajo
+                                  </FormLabel>
+                                </div>
                             </RadioGroup>
                           </FormControl>
                           <FormMessage />
