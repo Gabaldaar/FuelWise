@@ -42,6 +42,7 @@ export type FuelLog = {
   gasStation: string;
   isFillUp: boolean;
   missedPreviousFillUp?: boolean;
+  logType?: 'Particular' | 'Trabajo';
 };
 
 export type ServiceReminder = {

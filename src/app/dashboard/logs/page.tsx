@@ -10,7 +10,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { collection, query, orderBy } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, Gauge, Droplets, Tag, Building, User as UserIcon, Plus, Fuel, AlertTriangle, Loader2 } from 'lucide-react';
+import { Edit, Trash2, Gauge, Droplets, Tag, Building, User as UserIcon, Plus, Fuel, AlertTriangle, Loader2, Briefcase } from 'lucide-react';
 import DeleteFuelLogDialog from '@/components/dashboard/delete-fuel-log-dialog';
 import { usePreferences } from '@/context/preferences-context';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -19,6 +19,7 @@ import { DateRangePicker } from '@/components/reports/date-range-picker';
 import type { DateRange } from 'react-day-picker';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
 import EstimatedRefuelCard from '@/components/dashboard/estimated-refuel-card';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 function processFuelLogs(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
   // Sort logs by odometer ascending to calculate consumption correctly
@@ -72,6 +73,8 @@ export default function LogsPage() {
   const firestore = useFirestore();
   const { consumptionUnit, getFormattedConsumption } = usePreferences();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [logTypeFilter, setLogTypeFilter] = useState<'Todos' | 'Particular' | 'Trabajo'>('Todos');
+
 
   const allFuelLogsQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
@@ -90,15 +93,27 @@ export default function LogsPage() {
   
   const filteredLogs = useMemo(() => {
     if (!processedLogs) return [];
-    if (!dateRange?.from || !dateRange?.to) return processedLogs;
+    
+    let logs = processedLogs;
 
-    const from = startOfDay(dateRange.from);
-    const to = endOfDay(dateRange.to);
-    return processedLogs.filter(log => {
-      const logDate = new Date(log.date);
-      return logDate >= from && logDate <= to;
-    });
-  }, [processedLogs, dateRange]);
+    // Filter by date range
+    if (dateRange?.from && dateRange?.to) {
+        const from = startOfDay(dateRange.from);
+        const to = endOfDay(dateRange.to);
+        logs = logs.filter(log => {
+            const logDate = new Date(log.date);
+            return logDate >= from && logDate <= to;
+        });
+    }
+
+    // Filter by log type
+    if (logTypeFilter !== 'Todos') {
+        logs = logs.filter(log => (log.logType || 'Particular') === logTypeFilter);
+    }
+    
+    return logs;
+
+  }, [processedLogs, dateRange, logTypeFilter]);
 
   const avgConsumption = useMemo(() => {
     if (!vehicle || !allFuelLogs) return 0;
@@ -131,7 +146,6 @@ export default function LogsPage() {
               <p className="text-muted-foreground">Un historial completo de todas tus recargas.</p>
           </div>
            <div className="flex flex-col sm:flex-row gap-2">
-            <DateRangePicker dateRange={dateRange} setDateRange={setDateRange} />
             <AddFuelLogDialog vehicleId={vehicle.id} lastLog={lastLog} vehicle={vehicle as Vehicle}>
                 <Button>
                 <Plus className="-ml-1 mr-2 h-4 w-4" />
@@ -140,6 +154,22 @@ export default function LogsPage() {
             </AddFuelLogDialog>
           </div>
         </div>
+
+        <Card>
+            <CardContent className="p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <ToggleGroup 
+                    type="single" 
+                    value={logTypeFilter} 
+                    onValueChange={(value: 'Todos' | 'Particular' | 'Trabajo') => { if(value) setLogTypeFilter(value)}}
+                    aria-label="Filtrar por tipo de registro"
+                >
+                    <ToggleGroupItem value="Todos" aria-label="Ver todos">Todos</ToggleGroupItem>
+                    <ToggleGroupItem value="Particular" aria-label="Ver particulares"><UserIcon className="h-4 w-4 mr-2" />Particular</ToggleGroupItem>
+                    <ToggleGroupItem value="Trabajo" aria-label="Ver de trabajo"><Briefcase className="h-4 w-4 mr-2" />Trabajo</ToggleGroupItem>
+                </ToggleGroup>
+                <DateRangePicker dateRange={dateRange} setDateRange={setDateRange} />
+            </CardContent>
+        </Card>
         
         <EstimatedRefuelCard vehicle={vehicleWithAvgConsumption} allFuelLogs={allFuelLogs || []} />
 
@@ -168,6 +198,11 @@ export default function LogsPage() {
                                               ) : (
                                                   <Badge className="bg-amber-500/80 text-white">Parcial</Badge>
                                               )}
+                                               {log.logType === 'Trabajo' ? (
+                                                  <Badge variant="outline" className='border-blue-500/50 text-blue-600'>Trabajo</Badge>
+                                               ) : (
+                                                  <Badge variant="outline">Particular</Badge>
+                                               )}
                                               <p className="text-sm text-muted-foreground sm:hidden truncate">{formatCurrency(log.totalCost)} por {log.liters.toFixed(2)}L</p>
                                           </div>
                                       </div>
@@ -240,7 +275,7 @@ export default function LogsPage() {
              <div className="h-64 text-center flex flex-col items-center justify-center rounded-lg border-2 border-dashed">
                 <Fuel className="h-12 w-12 text-muted-foreground" />
                 <p className="mt-4 font-semibold">No hay registros de combustible.</p>
-                <p className="text-sm text-muted-foreground">Añade tu primera recarga para empezar o ajusta el filtro de fecha.</p>
+                <p className="text-sm text-muted-foreground">Añade tu primera recarga para empezar o ajusta el filtro.</p>
             </div>
         )}
     </div>

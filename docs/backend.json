@@ -146,6 +146,11 @@
         "missedPreviousFillUp": {
           "type": "boolean",
           "description": "Indicates if the user forgot to log the previous fill-up, invalidating consumption calculation for this entry."
+        },
+        "logType": {
+          "type": "string",
+          "enum": ["Particular", "Trabajo"],
+          "description": "The type of fuel log, e.g., for personal or work use."
         }
       },
       "required": [

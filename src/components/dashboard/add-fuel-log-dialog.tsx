@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, Plus, Loader2, Search, Check, ChevronsUpDown, Wand2 } from 'lucide-react';
+import { CalendarIcon, Plus, Loader2, Search, Check, ChevronsUpDown, Wand2, Briefcase, User as UserIconC } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -48,6 +49,7 @@ import FindNearbyGasStationsDialog from '../ai/find-nearby-gas-stations-dialog';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Separator } from '../ui/separator';
 import { getOfficialDolarRate } from '@/ai/flows/get-exchange-rate';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
 
 const formSchema = z.object({
@@ -65,6 +67,7 @@ const formSchema = z.object({
   gasStation: z.string().optional(),
   missedPreviousFillUp: z.boolean().default(false),
   exchangeRate: z.string().optional(),
+  logType: z.enum(['Particular', 'Trabajo']).default('Particular'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -126,6 +129,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
       gasStation: '',
       missedPreviousFillUp: false,
       exchangeRate: '',
+      logType: 'Particular',
     },
   });
 
@@ -167,6 +171,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
         gasStation: fuelLog?.gasStation || '',
         missedPreviousFillUp: fuelLog?.missedPreviousFillUp || false,
         exchangeRate: toLocaleString(fuelLog?.exchangeRate),
+        logType: fuelLog?.logType || 'Particular',
         };
         form.reset(defaultVals);
         
@@ -301,6 +306,42 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
              <div className="max-h-[65vh] overflow-y-auto pr-4 pl-1 -mr-4 -ml-1">
                 <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="logType"
+                      render={({ field }) => (
+                        <FormItem className="space-y-3">
+                          <FormLabel>Tipo de Recarga</FormLabel>
+                          <FormControl>
+                            <RadioGroup
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                              className="grid grid-cols-2 gap-4"
+                            >
+                              <FormItem>
+                                <FormControl>
+                                  <RadioGroupItem value="Particular" id="r1" className="sr-only" />
+                                </FormControl>
+                                <FormLabel htmlFor="r1" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
+                                  <UserIconC className="mb-3 h-6 w-6" />
+                                  Particular
+                                </FormLabel>
+                              </FormItem>
+                              <FormItem>
+                                <FormControl>
+                                  <RadioGroupItem value="Trabajo" id="r2" className="sr-only" />
+                                </FormControl>
+                                <FormLabel htmlFor="r2" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
+                                  <Briefcase className="mb-3 h-6 w-6" />
+                                  Trabajo
+                                </FormLabel>
+                              </FormItem>
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <div className="grid grid-cols-2 gap-4">
                         <FormField
                         control={form.control}
