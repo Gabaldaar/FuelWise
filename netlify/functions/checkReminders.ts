@@ -1,12 +1,9 @@
-
 import type { Handler } from '@netlify/functions';
 import admin from '@/firebase/admin';
 import type { ServiceReminder, Vehicle } from '@/lib/types';
 import webpush from 'web-push';
 import type { PushSubscription } from 'web-push';
 import { differenceInDays, differenceInHours } from 'date-fns';
-
-const db = admin.firestore();
 
 // --- CONFIGURACIÓN CENTRALIZADA ---
 // Este es el único lugar que controla el tiempo de enfriamiento.
@@ -15,7 +12,6 @@ const NOTIFICATION_COOLDOWN_HOURS = 1;
 const URGENCY_THRESHOLD_KM = 1000;
 const URGENCY_THRESHOLD_DAYS = 15;
 // ---------------------------------
-
 
 /**
  * El handler principal de la función de Netlify.
@@ -28,9 +24,24 @@ export const handler: Handler = async () => {
      return { statusCode: 500, body: 'VAPID keys are not set on the server.' };
   }
 
+  // Set VAPID details on each invocation (it's idempotent and safe)
   try {
+     webpush.setVapidDetails(
+        'mailto:your-email@example.com',
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+        process.env.VAPID_PRIVATE_KEY!
+    );
+    console.log('[Cron] VAPID details set successfully.');
+  } catch(e: any) {
+      console.error('[Cron] Error setting VAPID details:', e.message);
+      return { statusCode: 500, body: `VAPID configuration error: ${e.message}` };
+  }
+
+  try {
+    const db = admin.firestore(); // Get Firestore instance after potential initialization
+    console.log('[Cron] Firestore instance obtained.');
+
     // 1. Usar una collectionGroup query para obtener todos los recordatorios pendientes.
-    // Esta consulta requiere un índice compuesto en Firestore.
     const remindersSnap = await db.collectionGroup('service_reminders')
                                   .where('isCompleted', '==', false)
                                   .orderBy('dueDate', 'desc')
@@ -40,11 +51,11 @@ export const handler: Handler = async () => {
         console.log('[Cron] No pending reminders found.');
         return { statusCode: 200, body: 'No pending reminders found.' };
     }
-    console.log(`[Cron] Found ${remindersSnap.docs.length} pending reminders.`);
+    console.log(`[Cron] Found ${remindersSnap.docs.length} pending reminders to check.`);
 
     const subscriptionsSnap = await db.collection('subscriptions').get();
     if (subscriptionsSnap.empty) {
-        console.log('[Cron] No active push subscriptions.');
+        console.log('[Cron] No active push subscriptions found. Cannot send notifications.');
         return { statusCode: 200, body: 'No active push subscriptions.' };
     }
     const allSubscriptions = subscriptionsSnap.docs.map(doc => doc.data().subscription as PushSubscription);
@@ -62,39 +73,27 @@ export const handler: Handler = async () => {
             continue;
         }
         
-        // --- Get Vehicle Details ---
         const vehicleSnap = await db.collection('vehicles').doc(vehicleId).get();
         if (!vehicleSnap.exists) {
             console.log(`[Cron] Skipping reminder ${reminder.id}: Vehicle with ID ${vehicleId} not found.`);
             continue;
         }
         const vehicleData = vehicleSnap.data() as Vehicle;
-        const vehicle: Vehicle = { 
-            id: vehicleSnap.id,
-            make: vehicleData.make,
-            model: vehicleData.model,
-            year: vehicleData.year,
-            plate: vehicleData.plate,
-            fuelCapacityLiters: vehicleData.fuelCapacityLiters,
-            averageConsumptionKmPerLiter: vehicleData.averageConsumptionKmPerLiter,
-            imageUrl: vehicleData.imageUrl,
-            imageHint: vehicleData.imageHint,
-         };
          
-        console.log(`[Cron] Processing reminder "${reminder.serviceType}" for vehicle ${vehicle.make} ${vehicle.model}.`);
+        console.log(`[Cron] Processing reminder "${reminder.serviceType}" for vehicle ${vehicleData.make} ${vehicleData.model}.`);
 
-        // --- Get Latest Odometer ---
         const lastFuelLogSnap = await db.collection('vehicles').doc(vehicleId).collection('fuel_records').orderBy('odometer', 'desc').limit(1).get();
         const lastTripSnap = await db.collection('vehicles').doc(vehicleId).collection('trips').orderBy('endOdometer', 'desc').limit(1).get();
+        
         const lastFuelOdometer = lastFuelLogSnap.empty ? 0 : lastFuelLogSnap.docs[0].data().odometer;
-        const lastTripOdometer = lastTripSnap.empty ? 0 : lastTripSnap.docs[0].data().endOdometer || 0;
+        const lastTripOdometer = lastTripSnap.empty ? 0 : (lastTripSnap.docs[0].data().endOdometer || 0);
         const lastOdometer = Math.max(lastFuelOdometer, lastTripOdometer);
 
         if (lastOdometer === 0) {
-          console.log(`[Cron] Skipping vehicle ${vehicle.make} ${vehicle.model}, no odometer reading found.`);
+          console.log(`[Cron] Skipping vehicle ${vehicleData.make} ${vehicleData.model}, no odometer reading found.`);
           continue;
         };
-        console.log(`[Cron] Latest odometer for ${vehicle.make} is ${lastOdometer} km.`);
+        console.log(`[Cron] Latest odometer for ${vehicleData.make} is ${lastOdometer} km.`);
 
         const kmsRemaining = reminder.dueOdometer ? reminder.dueOdometer - lastOdometer : null;
         const daysRemaining = reminder.dueDate ? differenceInDays(new Date(reminder.dueDate), new Date()) : null;
@@ -110,36 +109,29 @@ export const handler: Handler = async () => {
             const hoursSinceLastSent = lastSent ? differenceInHours(new Date(), lastSent) : null;
 
             if (hoursSinceLastSent !== null && hoursSinceLastSent < NOTIFICATION_COOLDOWN_HOURS) {
-                console.log(`[Cron] Skipping notification for "${reminder.serviceType}" on ${vehicle.make}. Cooldown active. Last sent: ${hoursSinceLastSent}h ago. Threshold: ${NOTIFICATION_COOLDOWN_HOURS}h.`);
+                console.log(`[Cron] Skipping notification for "${reminder.serviceType}" on ${vehicleData.make}. Cooldown active. Last sent: ${hoursSinceLastSent}h ago. Threshold: ${NOTIFICATION_COOLDOWN_HOURS}h.`);
                 continue;
             }
             
-            const title = `Alerta de Servicio: ${vehicle.make} ${vehicle.model}`;
+            const title = `Alerta de Servicio: ${vehicleData.make} ${vehicleData.model}`;
             let body = `${reminder.serviceType} - `;
             body += isOverdue ? '¡Servicio Vencido!' : '¡Servicio Próximo!';
             
             const payload = JSON.stringify({ 
                 title, 
                 body, 
-                icon: vehicle.imageUrl || '/icon-192x192.png',
+                icon: vehicleData.imageUrl || '/icon-192x192.png',
                 tag: reminder.id
             });
             
             console.log(`[Cron] Preparing to send notification for reminder: ${reminder.id}`, payload);
             
-            // ** VAPID CONFIG ISOLATION **
-            // Initialize VAPID details just before sending.
-            webpush.setVapidDetails(
-              'mailto:your-email@example.com',
-              process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-              process.env.VAPID_PRIVATE_KEY!
-            );
-
             let reminderSentToAtLeastOneDevice = false;
             const sendPromises = allSubscriptions.map(subscription => 
                 webpush.sendNotification(subscription, payload)
                 .then(() => {
                     reminderSentToAtLeastOneDevice = true;
+                    console.log(`[Cron] Successfully sent notification to endpoint: ${subscription.endpoint.substring(0, 30)}...`);
                 })
                 .catch(error => {
                      if (error.statusCode === 410 || error.statusCode === 404) {
@@ -155,14 +147,14 @@ export const handler: Handler = async () => {
             await Promise.all(sendPromises);
 
             if (reminderSentToAtLeastOneDevice) {
-                console.log(`[Cron] Notification sent for "${reminder.serviceType}" on vehicle ${vehicle.make}.`);
+                console.log(`[Cron] Notification sent for "${reminder.serviceType}" on vehicle ${vehicleData.make}. Updating timestamp.`);
                 notificationsSent++;
                 await reminderDoc.ref.update({
                     lastNotificationSent: new Date().toISOString()
                 });
             }
         } else {
-             console.log(`[Cron] Reminder "${reminder.serviceType}" for ${vehicle.make} is not due for notification yet.`);
+             console.log(`[Cron] Reminder "${reminder.serviceType}" for ${vehicleData.make} is not due for notification yet.`);
         }
     }
     
