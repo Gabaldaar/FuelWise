@@ -74,6 +74,7 @@ export const handler: Handler = async () => {
         process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
         process.env.VAPID_PRIVATE_KEY!
     );
+    console.log('[Cron] VAPID details set successfully.');
   } catch(e: any) {
       console.error('[Cron] Error setting VAPID details:', e.message);
       return { statusCode: 500, body: `VAPID configuration error: ${e.message}` };
