@@ -11,51 +11,12 @@ const db = admin.firestore();
 
 // --- CONFIGURACIÓN CENTRALIZADA ---
 // Este es el único lugar que controla el tiempo de enfriamiento.
-// El valor en la UI es solo de referencia.
 const NOTIFICATION_COOLDOWN_HOURS = 1; 
 
 const URGENCY_THRESHOLD_KM = 1000;
 const URGENCY_THRESHOLD_DAYS = 15;
 // ---------------------------------
 
-/**
- * Obtiene el último odómetro registrado para un vehículo específico.
- */
-async function getLatestOdometer(vehicleId: string): Promise<number> {
-    const lastFuelLogSnap = await db.collection('vehicles').doc(vehicleId).collection('fuel_records').orderBy('odometer', 'desc').limit(1).get();
-    const lastTripSnap = await db.collection('vehicles').doc(vehicleId).collection('trips').orderBy('endOdometer', 'desc').limit(1).get();
-    
-    const lastFuelOdometer = lastFuelLogSnap.empty ? 0 : lastFuelLogSnap.docs[0].data().odometer;
-    const lastTripOdometer = lastTripSnap.empty ? 0 : lastTripSnap.docs[0].data().endOdometer || 0;
-    
-    return Math.max(lastFuelOdometer, lastTripOdometer);
-}
-
-/**
- * Obtiene los detalles de un vehículo por su ID.
- */
-async function getVehicleDetails(vehicleId: string): Promise<Vehicle | null> {
-    const vehicleSnap = await db.collection('vehicles').doc(vehicleId).get();
-    if (!vehicleSnap.exists) {
-        console.log(`[Cron] Vehicle with ID ${vehicleId} not found.`);
-        return null;
-    }
-    // Explicitly map the fields to ensure all required ones, including imageUrl, are present.
-    const data = vehicleSnap.data();
-    if (!data) return null;
-
-    return { 
-        id: vehicleSnap.id,
-        make: data.make,
-        model: data.model,
-        year: data.year,
-        plate: data.plate,
-        fuelCapacityLiters: data.fuelCapacityLiters,
-        averageConsumptionKmPerLiter: data.averageConsumptionKmPerLiter,
-        imageUrl: data.imageUrl,
-        imageHint: data.imageHint,
-     } as Vehicle;
-}
 
 /**
  * El handler principal de la función de Netlify.
@@ -79,14 +40,18 @@ export const handler: Handler = async () => {
     const remindersSnap = await db.collectionGroup('service_reminders').where('isCompleted', '==', false).get();
     
     if (remindersSnap.empty) {
+        console.log('[Cron] No pending reminders found.');
         return { statusCode: 200, body: 'No pending reminders found.' };
     }
+    console.log(`[Cron] Found ${remindersSnap.docs.length} pending reminders.`);
 
     const subscriptionsSnap = await db.collection('subscriptions').get();
     if (subscriptionsSnap.empty) {
+        console.log('[Cron] No active push subscriptions.');
         return { statusCode: 200, body: 'No active push subscriptions.' };
     }
     const allSubscriptions = subscriptionsSnap.docs.map(doc => doc.data().subscription as PushSubscription);
+    console.log(`[Cron] Found ${allSubscriptions.length} active subscriptions.`);
 
     let notificationsSent = 0;
     
@@ -95,19 +60,44 @@ export const handler: Handler = async () => {
         const reminder = { id: reminderDoc.id, ...reminderDoc.data() } as ServiceReminder & { id: string };
         const vehicleId = reminderDoc.ref.parent.parent?.id;
 
-        if (!vehicleId) continue;
-        
-        const vehicle = await getVehicleDetails(vehicleId);
-        if (!vehicle) {
-            console.log(`[Cron] Skipping reminder ${reminder.id} because vehicle details could not be fetched.`);
+        if (!vehicleId) {
+            console.log(`[Cron] Skipping reminder ${reminder.id}: could not determine vehicleId.`);
             continue;
         }
+        
+        // --- Get Vehicle Details ---
+        const vehicleSnap = await db.collection('vehicles').doc(vehicleId).get();
+        if (!vehicleSnap.exists) {
+            console.log(`[Cron] Skipping reminder ${reminder.id}: Vehicle with ID ${vehicleId} not found.`);
+            continue;
+        }
+        const vehicleData = vehicleSnap.data() as Vehicle;
+        const vehicle: Vehicle = { 
+            id: vehicleSnap.id,
+            make: vehicleData.make,
+            model: vehicleData.model,
+            year: vehicleData.year,
+            plate: vehicleData.plate,
+            fuelCapacityLiters: vehicleData.fuelCapacityLiters,
+            averageConsumptionKmPerLiter: vehicleData.averageConsumptionKmPerLiter,
+            imageUrl: vehicleData.imageUrl,
+            imageHint: vehicleData.imageHint,
+         };
+         
+        console.log(`[Cron] Processing reminder "${reminder.serviceType}" for vehicle ${vehicle.make} ${vehicle.model}.`);
 
-        const lastOdometer = await getLatestOdometer(vehicleId);
+        // --- Get Latest Odometer ---
+        const lastFuelLogSnap = await db.collection('vehicles').doc(vehicleId).collection('fuel_records').orderBy('odometer', 'desc').limit(1).get();
+        const lastTripSnap = await db.collection('vehicles').doc(vehicleId).collection('trips').orderBy('endOdometer', 'desc').limit(1).get();
+        const lastFuelOdometer = lastFuelLogSnap.empty ? 0 : lastFuelLogSnap.docs[0].data().odometer;
+        const lastTripOdometer = lastTripSnap.empty ? 0 : lastTripSnap.docs[0].data().endOdometer || 0;
+        const lastOdometer = Math.max(lastFuelOdometer, lastTripOdometer);
+
         if (lastOdometer === 0) {
           console.log(`[Cron] Skipping vehicle ${vehicle.make} ${vehicle.model}, no odometer reading found.`);
           continue;
         };
+        console.log(`[Cron] Latest odometer for ${vehicle.make} is ${lastOdometer} km.`);
 
         const kmsRemaining = reminder.dueOdometer ? reminder.dueOdometer - lastOdometer : null;
         const daysRemaining = reminder.dueDate ? differenceInDays(new Date(reminder.dueDate), new Date()) : null;
@@ -124,7 +114,7 @@ export const handler: Handler = async () => {
 
             if (hoursSinceLastSent !== null && hoursSinceLastSent < NOTIFICATION_COOLDOWN_HOURS) {
                 console.log(`[Cron] Skipping notification for "${reminder.serviceType}" on ${vehicle.make}. Cooldown active. Last sent: ${hoursSinceLastSent}h ago. Threshold: ${NOTIFICATION_COOLDOWN_HOURS}h.`);
-                continue; // Saltar al siguiente recordatorio
+                continue;
             }
             
             const title = `Alerta de Servicio: ${vehicle.make} ${vehicle.model}`;
@@ -147,8 +137,8 @@ export const handler: Handler = async () => {
                     reminderSentToAtLeastOneDevice = true;
                 })
                 .catch(error => {
-                     if (error.statusCode === 410) {
-                        console.log('[Cron] Subscription expired. Deleting from DB...');
+                     if (error.statusCode === 410 || error.statusCode === 404) {
+                        console.log('[Cron] Subscription expired or not found. Deleting from DB...');
                         const docId = encodeURIComponent(subscription.endpoint);
                         db.collection('subscriptions').doc(docId).delete();
                     } else {
@@ -166,6 +156,8 @@ export const handler: Handler = async () => {
                     lastNotificationSent: new Date().toISOString()
                 });
             }
+        } else {
+             console.log(`[Cron] Reminder "${reminder.serviceType}" for ${vehicle.make} is not due for notification yet.`);
         }
     }
     
