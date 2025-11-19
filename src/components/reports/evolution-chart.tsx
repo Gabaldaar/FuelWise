@@ -4,6 +4,7 @@ import { Line, LineChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface EvolutionChartProps<T> {
   title: string;
@@ -16,7 +17,7 @@ interface EvolutionChartProps<T> {
 }
 
 export function EvolutionChart<T>({ title, data, dataKey, valueKey, valueFormatter, tooltipLabel, icon: Icon }: EvolutionChartProps<T>) {
-
+  const isMobile = useIsMobile();
   const chartData = data.map(item => ({
     ...item,
     formattedDate: formatDate(item[dataKey] as string),
@@ -36,7 +37,7 @@ export function EvolutionChart<T>({ title, data, dataKey, valueKey, valueFormatt
         <div className="h-[250px]">
         {chartData.length > 1 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+            <LineChart data={chartData} margin={{ top: 5, right: 20, left: isMobile ? 0 : -10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis 
                 dataKey="formattedDate" 
