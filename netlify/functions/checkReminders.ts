@@ -52,7 +52,7 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 // --- NOTIFICATION LOGIC CONFIG ---
-const NOTIFICATION_COOLDOWN_HOURS = 1; 
+const NOTIFICATION_COOLDOWN_HOURS = 12; 
 const URGENCY_THRESHOLD_KM = 1000;
 const URGENCY_THRESHOLD_DAYS = 15;
 
