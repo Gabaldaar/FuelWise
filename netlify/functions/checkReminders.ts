@@ -13,7 +13,10 @@ const db = admin.firestore();
 // --- CONFIGURACIÓN CENTRALIZADA ---
 const URGENCY_THRESHOLD_KM = 1000;
 const URGENCY_THRESHOLD_DAYS = 15;
-const NOTIFICATION_COOLDOWN_HOURS = 48; // Horas a esperar antes de reenviar una notificación.
+// ¡IMPORTANTE! Este es el único lugar que controla el tiempo de enfriamiento.
+// El valor en la UI es solo de referencia. Lo ponemos en 1 para probar.
+const NOTIFICATION_COOLDOWN_HOURS = 1; 
+// ---------------------------------
 
 const vehicleOdometerCache = new Map<string, number>();
 const allSubscriptionsCache: { subs: PushSubscription[], timestamp: number | null } = { subs: [], timestamp: null };
@@ -82,13 +85,13 @@ async function checkAndSendForVehicle(vehicle: Vehicle) {
 
         if (isOverdue || isUrgent) {
             const lastSent = reminder.lastNotificationSent ? new Date(reminder.lastNotificationSent) : null;
-            if (lastSent && differenceInHours(new Date(), lastSent) < NOTIFICATION_COOLDOWN_HOURS) {
-                console.log(`[Cron] Skipping notification for ${reminder.serviceType} (sent recently).`);
-                continue;
+            const hoursSinceLastSent = lastSent ? differenceInHours(new Date(), lastSent) : null;
+
+            if (lastSent && hoursSinceLastSent !== null && hoursSinceLastSent < NOTIFICATION_COOLDOWN_HOURS) {
+                console.log(`[Cron] Skipping notification for ${reminder.serviceType} for vehicle ${vehicle.make}. Cooldown active. Last sent: ${hoursSinceLastSent}h ago. Threshold: ${NOTIFICATION_COOLDOWN_HOURS}h.`);
+                continue; // Saltar al siguiente recordatorio
             }
             
-            notificationsSent++; // Increment count only when we are actually going to send.
-
             const title = `Alerta de Servicio: ${vehicle.make} ${vehicle.model}`;
             let body = `${reminder.serviceType} - `;
             body += isOverdue ? '¡Servicio Vencido!' : '¡Servicio Próximo!';
@@ -120,6 +123,8 @@ async function checkAndSendForVehicle(vehicle: Vehicle) {
             await Promise.all(sendPromises);
 
             if (reminderSentToAtLeastOneDevice) {
+                console.log(`[Cron] Notification sent for ${reminder.serviceType} for vehicle ${vehicle.make}.`);
+                notificationsSent++;
                 await db.collection('vehicles').doc(vehicle.id).collection('service_reminders').doc(reminder.id).update({
                     lastNotificationSent: new Date().toISOString()
                 });
