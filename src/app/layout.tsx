@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   description: 'Intelligent fuel and vehicle management',
   manifest: '/manifest.json',
   icons: {
+    icon: '/favicon.ico',
     apple: '/icon-192x192.png',
   },
 };
