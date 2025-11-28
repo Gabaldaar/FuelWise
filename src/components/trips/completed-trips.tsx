@@ -65,9 +65,9 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
         const { costPerKmUSD, fuelCostPerKmARS } = calculateCostsPerKm(vehicle, fallbackConsumption, lastPricePerLiter);
         
         let lastOdometer = trip.startOdometer;
-        const processedStages = trip.stages.map(stage => {
+        const processedStages = (trip.stages || []).map(stage => {
             const kmTraveled = stage.stageEndOdometer - lastOdometer;
-            const otherExpenses = stage.expenses.reduce((acc, exp) => acc + exp.amount, 0);
+            const otherExpenses = (stage.expenses || []).reduce((acc, exp) => acc + exp.amount, 0);
 
             const detailedCostsARS = calculateTotalCostInARS(costPerKmUSD, fuelCostPerKmARS, exchangeRate);
             
@@ -90,13 +90,12 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
             };
         });
 
-        const totalKm = trip.stages.reduce((acc, stage) => acc + (stage.stageEndOdometer - trip.startOdometer), 0); // This logic is flawed, needs stage-by-stage sum
         const totalKmCorrect = processedStages.reduce((acc, stage) => acc + stage.kmTraveled, 0);
         const totalExpenses = processedStages.reduce((acc, stage) => acc + stage.otherExpenses, 0);
         const totalRealCost = processedStages.reduce((acc, stage) => acc + stage.totalRealCostForStage, 0);
 
         let duration = "N/A";
-        if (trip.stages.length > 0 && trip.startDate) {
+        if (trip.stages && trip.stages.length > 0 && trip.startDate) {
             const lastStage = trip.stages[trip.stages.length - 1];
             const hours = differenceInHours(new Date(lastStage.stageEndDate), new Date(trip.startDate));
             const minutes = differenceInMinutes(new Date(lastStage.stageEndDate), new Date(trip.startDate)) % 60;
@@ -108,7 +107,7 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
     }, [trip, vehicle, allFuelLogs, exchangeRate, lastFuelLog]);
 
     const { processedStages } = tripCalculations;
-    const lastOdometerInTrip = trip.stages.length > 0 ? trip.stages[trip.stages.length-1].stageEndOdometer : trip.startOdometer;
+    const lastOdometerInTrip = (trip.stages && trip.stages.length > 0) ? trip.stages[trip.stages.length-1].stageEndOdometer : trip.startOdometer;
 
     return (
         <div className="space-y-4 pt-4 border-t pl-4 sm:pl-12">
@@ -211,7 +210,7 @@ export default function CompletedTrips({ trips, vehicle, allFuelLogs }: Complete
   }
 
   const getTripSummary = (trip: Trip) => {
-    if (trip.stages.length === 0) return { distance: 0, endDate: trip.startDate };
+    if (!trip.stages || trip.stages.length === 0) return { distance: 0, endDate: trip.startDate };
     const lastStage = trip.stages[trip.stages.length - 1];
     const distance = lastStage.stageEndOdometer - trip.startOdometer;
     const endDate = lastStage.stageEndDate;
