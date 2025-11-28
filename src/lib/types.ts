@@ -1,5 +1,6 @@
 
 
+
 export type Vehicle = {
   id: string;
   make: string;
@@ -71,6 +72,14 @@ export type TripExpense = {
   amount: number;
 };
 
+export type TripStage = {
+  id: string;
+  stageEndOdometer: number;
+  stageEndDate: string; // ISO datetime string
+  expenses: TripExpense[];
+  notes?: string;
+};
+
 export type Trip = {
     id: string;
     vehicleId: string;
@@ -78,15 +87,14 @@ export type Trip = {
     username: string;
     tripType: string;
     destination: string;
-    notes?: string;
+    notes?: string; // Overall trip notes
     startDate: string; // ISO datetime string
     startOdometer: number;
-    endDate?: string; // ISO datetime string
-    endOdometer?: number;
     status: 'active' | 'completed';
-    expenses?: TripExpense[];
-    exchangeRate?: number; // Dollar exchange rate at the time of completion
+    stages: TripStage[];
+    exchangeRate?: number; // Overall dollar exchange rate for cost calculation consistency
 };
+
 
 export type ProcessedFuelLog = FuelLog & {
   distanceTraveled?: number;

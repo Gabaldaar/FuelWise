@@ -237,9 +237,55 @@
         "isCompleted"
       ]
     },
+    "TripStage": {
+      "title": "TripStage",
+      "description": "Represents a single stage or leg of a multi-stage trip.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the stage."
+        },
+        "stageEndOdometer": {
+          "type": "number",
+          "description": "Odometer reading at the end of this stage."
+        },
+        "stageEndDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Date and time this stage was completed."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional notes specific to this stage."
+        },
+        "expenses": {
+          "type": "array",
+          "description": "A list of expenses associated with this stage.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "number"
+              }
+            },
+            "required": ["description", "amount"]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "stageEndOdometer",
+        "stageEndDate",
+        "expenses"
+      ]
+    },
     "Trip": {
       "title": "Trip",
-      "description": "Represents a vehicle trip.",
+      "description": "Represents a vehicle trip, which can consist of multiple stages.",
       "type": "object",
       "properties": {
         "id": {
@@ -264,11 +310,11 @@
         },
         "destination": {
           "type": "string",
-          "description": "The destination of the trip."
+          "description": "The final destination of the trip."
         },
         "notes": {
           "type": "string",
-          "description": "Optional notes about the trip."
+          "description": "Optional overall notes about the trip."
         },
         "startDate": {
           "type": "string",
@@ -279,15 +325,6 @@
           "type": "number",
           "description": "Odometer reading at the start of the trip."
         },
-        "endDate": {
-          "type": "string",
-          "format": "date-time",
-          "description": "End date and time of the trip."
-        },
-        "endOdometer": {
-          "type": "number",
-          "description": "Odometer reading at the end of the trip."
-        },
         "status": {
           "type": "string",
           "enum": [
@@ -296,20 +333,11 @@
           ],
           "description": "The current status of the trip."
         },
-        "expenses": {
+        "stages": {
           "type": "array",
-          "description": "A list of expenses associated with the trip.",
+          "description": "A list of stages or legs that make up the trip.",
           "items": {
-            "type": "object",
-            "properties": {
-              "description": {
-                "type": "string"
-              },
-              "amount": {
-                "type": "number"
-              }
-            },
-            "required": ["description", "amount"]
+            "$ref": "#/backend/entities/TripStage"
           }
         },
         "exchangeRate": {
@@ -326,7 +354,8 @@
         "destination",
         "startDate",
         "startOdometer",
-        "status"
+        "status",
+        "stages"
       ]
     },
     "TripType": {

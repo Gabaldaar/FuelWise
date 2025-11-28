@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2, Plus, Trash2, Wand2 } from 'lucide-react';
+import { Loader2, Plus, Trash2, Wand2, Flag, Route, ChevronsRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -29,10 +29,9 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { toDateTimeLocalString, parseCurrency, formatCurrency } from '@/lib/utils';
-import type { Trip, ConfigItem, User } from '@/lib/types';
+import type { Trip, ConfigItem, User, TripStage } from '@/lib/types';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { doc, collection, query, orderBy } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -46,6 +45,14 @@ const expenseSchema = z.object({
   amount: z.string().min(1, 'El monto debe ser positivo.'),
 });
 
+const stageSchema = z.object({
+  id: z.string(),
+  stageEndOdometer: z.coerce.number().min(1, 'El odómetro es obligatorio.'),
+  stageEndDate: z.string().refine(val => !isNaN(Date.parse(val)), { message: "Fecha inválida." }),
+  notes: z.string().optional(),
+  expenses: z.array(expenseSchema).optional(),
+});
+
 const formSchema = z.object({
   tripType: z.string().min(1, 'El tipo de viaje es obligatorio.'),
   destination: z.string().min(1, 'El destino es obligatorio.'),
@@ -55,27 +62,23 @@ const formSchema = z.object({
   startOdometer: z.coerce.number().min(1, 'El odómetro de inicio es obligatorio.'),
 
   status: z.enum(['active', 'completed']).default('active'),
-  
-  endDate: z.string().optional(),
-  endOdometer: z.coerce.number().optional(),
-  expenses: z.array(expenseSchema).optional(),
+  stages: z.array(stageSchema).optional(),
   exchangeRate: z.string().optional(),
 }).refine(data => {
-  if (data.status === 'completed') {
-    return !!data.endDate && !isNaN(Date.parse(data.endDate)) && !!data.endOdometer;
-  }
-  return true;
-}, {
-  message: "La fecha y odómetro de fin son obligatorios para completar un viaje.",
-  path: ["endDate"],
-}).refine(data => {
-    if (data.status === 'completed' && data.endOdometer) {
-        return data.endOdometer >= data.startOdometer;
+    // Custom validation to ensure endOdometer of a stage is greater than the previous one
+    if (data.stages && data.stages.length > 0) {
+        let lastOdometer = data.startOdometer;
+        for (const stage of data.stages) {
+            if (stage.stageEndOdometer <= lastOdometer) {
+                return false; // Fails validation
+            }
+            lastOdometer = stage.stageEndOdometer;
+        }
     }
     return true;
 }, {
-    message: "El odómetro final debe ser mayor o igual al inicial.",
-    path: ["endOdometer"],
+    message: "El odómetro de una etapa debe ser mayor que el de la etapa anterior.",
+    path: ["stages"],
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -91,11 +94,12 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingRate, setIsFetchingRate] = useState(false);
+  const [activeStage, setActiveStage] = useState<'new' | 'final' | null>(null);
   const { toast } = useToast();
   const { user: authUser } = useUser();
   const firestore = useFirestore();
   const isEditing = !!trip;
-
+  
   const userProfileRef = useMemoFirebase(() => {
     if (!authUser) return null;
     return doc(firestore, 'users', authUser.uid);
@@ -116,49 +120,27 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         notes: '',
         startOdometer: lastOdometer || 0,
         status: 'active',
-        endOdometer: lastOdometer || 0,
-        expenses: [],
+        stages: [],
         exchangeRate: '',
     }
   });
   
-  const { control, watch, reset, setValue } = form;
-  const status = watch('status');
+  const { control, watch, reset, setValue, handleSubmit, trigger } = form;
   
   const { fields, append, remove } = useFieldArray({
     control,
-    name: "expenses",
+    name: "stages",
   });
+
+  const stages = watch('stages');
+  const startOdometer = watch('startOdometer');
   
-  const handleFetchRate = async () => {
-    setIsFetchingRate(true);
-    try {
-        const rateData = await getOfficialDolarRate();
-        setValue('exchangeRate', rateData.rate.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), { shouldValidate: true });
-        toast({
-            title: 'Cotización Obtenida',
-            description: `Dólar Oficial (Vendedor): ${formatCurrency(rateData.rate)}`,
-        });
-    } catch (error: any) {
-        toast({
-            variant: 'destructive',
-            title: 'Error al obtener cotización',
-            description: error.message || 'No se pudo obtener el valor del dólar. Inténtalo de nuevo o ingrésalo manualmente.',
-        });
-    } finally {
-        setIsFetchingRate(false);
-    }
-  };
+  const lastStageOdometer = stages && stages.length > 0 ? stages[stages.length - 1].stageEndOdometer : startOdometer;
 
   useEffect(() => {
     if (open) {
       const now = toDateTimeLocalString(new Date());
       const toLocaleString = (num: number | undefined) => num?.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '';
-
-      const expenses = trip?.expenses?.map(e => ({
-        description: e.description,
-        amount: toLocaleString(e.amount),
-      })) || [];
 
       reset({
         tripType: trip?.tripType || '',
@@ -167,19 +149,58 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         startDate: trip ? toDateTimeLocalString(new Date(trip.startDate)) : now,
         startOdometer: trip?.startOdometer || lastOdometer || 0,
         status: trip?.status || 'active',
-        endDate: trip?.endDate ? toDateTimeLocalString(new Date(trip.endDate)) : now,
-        endOdometer: trip?.endOdometer || lastOdometer || 0,
-        expenses,
+        stages: trip?.stages?.map(s => ({
+            ...s,
+            expenses: s.expenses.map(e => ({description: e.description, amount: toLocaleString(e.amount)}))
+        })) || [],
         exchangeRate: toLocaleString(trip?.exchangeRate),
       });
+      setActiveStage(null);
     }
   }, [open, trip, reset, lastOdometer]);
   
-  useEffect(() => {
-    if (status === 'completed' && (!form.getValues('endOdometer') || form.getValues('endOdometer') === trip?.startOdometer) && lastOdometer) {
-      setValue('endOdometer', lastOdometer);
+  const handleAddStage = async () => {
+    const isFieldsValid = await trigger(["tripType", "destination", "startOdometer", "startDate"]);
+    if (!isFieldsValid) {
+        toast({
+            variant: "destructive",
+            title: "Faltan Datos",
+            description: "Por favor completa los detalles iniciales del viaje antes de añadir una etapa.",
+        });
+        return;
     }
-  }, [status, lastOdometer, setValue, form, trip]);
+    const newStageId = doc(collection(firestore, '_')).id;
+    append({
+        id: newStageId,
+        stageEndOdometer: lastStageOdometer,
+        stageEndDate: toDateTimeLocalString(new Date()),
+        notes: '',
+        expenses: []
+    });
+    setActiveStage('new');
+  };
+
+  const handleFinalizeTrip = async () => {
+    const isFieldsValid = await trigger(["tripType", "destination", "startOdometer", "startDate"]);
+    if (!isFieldsValid) {
+        toast({
+            variant: "destructive",
+            title: "Faltan Datos",
+            description: "Por favor completa los detalles iniciales del viaje.",
+        });
+        return;
+    }
+    const newStageId = doc(collection(firestore, '_')).id;
+     append({
+        id: newStageId,
+        stageEndOdometer: lastOdometer,
+        stageEndDate: toDateTimeLocalString(new Date()),
+        notes: 'Viaje finalizado.',
+        expenses: []
+    });
+    setValue('status', 'completed');
+    setActiveStage('final');
+  }
 
   async function onSubmit(values: FormValues) {
     if (!authUser || !userProfile) {
@@ -201,13 +222,12 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         notes: values.notes,
         startOdometer: values.startOdometer,
         status: values.status,
-        expenses: values.expenses?.map(e => ({ description: e.description, amount: parseCurrency(e.amount) })) || [],
+        stages: values.stages?.map(s => ({
+            ...s,
+            expenses: s.expenses?.map(e => ({description: e.description, amount: parseCurrency(e.amount)})) || []
+        })) || [],
         startDate: new Date(values.startDate).toISOString(),
-        ...(values.status === 'completed' && {
-            endOdometer: values.endOdometer,
-            endDate: values.endDate ? new Date(values.endDate).toISOString() : undefined,
-            exchangeRate: values.exchangeRate ? parseCurrency(values.exchangeRate) : undefined,
-        }),
+        exchangeRate: values.exchangeRate ? parseCurrency(values.exchangeRate) : undefined,
     };
 
     setDocumentNonBlocking(tripRef, tripData, { merge: true });
@@ -224,44 +244,21 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-headline">{isEditing ? (trip?.status === 'active' ? 'Editar Viaje Activo' : 'Editar Viaje') : 'Iniciar Nuevo'} Viaje</DialogTitle>
           <DialogDescription>
-            {isEditing ? 'Completa o edita los detalles de tu viaje.' : 'Registra un nuevo viaje para tu vehículo.'}
+            {isEditing ? 'Añade etapas o finaliza los detalles de tu viaje.' : 'Registra un nuevo viaje para tu vehículo.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
              <div className="max-h-[65vh] overflow-y-auto pr-4 pl-1 -mr-4 -ml-1">
                 <div className="space-y-4">
-                  
-                  {isEditing && trip?.status !== 'completed' && (
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                          <div className="space-y-0.5">
-                            <FormLabel>Finalizar Viaje</FormLabel>
-                            <FormDescription>Marca el viaje como completado.</FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch 
-                              checked={field.value === 'completed'} 
-                              onCheckedChange={(checked) => field.onChange(checked ? 'completed' : 'active')}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  )}
-
-                  <Separator />
                   <p className="text-sm font-medium">Detalles del Viaje</p>
                   
                   <div className="grid grid-cols-2 gap-4">
-                      <FormField control={form.control} name="tripType" render={({ field }) => (
+                      <FormField control={control} name="tripType" render={({ field }) => (
                           <FormItem>
                           <FormLabel>Tipo de Viaje</FormLabel>
                               <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
@@ -273,103 +270,73 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
                           <FormMessage />
                           </FormItem>
                       )} />
-                       <FormField control={form.control} name="destination" render={({ field }) => (
+                       <FormField control={control} name="destination" render={({ field }) => (
                           <FormItem>
-                          <FormLabel>Destino</FormLabel>
+                          <FormLabel>Destino Final</FormLabel>
                           <FormControl><Input placeholder="e.g., Oficina" {...field} /></FormControl>
                           <FormMessage />
                           </FormItem>
                       )} />
                   </div>
 
-                  <FormField control={form.control} name="notes" render={({ field }) => (
-                    <FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea placeholder="Notas adicionales..." {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormField control={control} name="notes" render={({ field }) => (
+                    <FormItem><FormLabel>Notas Generales</FormLabel><FormControl><Textarea placeholder="Notas sobre el viaje completo..." {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
 
                   <div className="grid grid-cols-2 gap-4">
-                      <FormField control={form.control} name="startOdometer" render={({ field }) => (
+                      <FormField control={control} name="startOdometer" render={({ field }) => (
                           <FormItem><FormLabel>Odómetro Inicial</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                       )} />
-                      <FormField control={form.control} name="startDate" render={({ field }) => (
+                      <FormField control={control} name="startDate" render={({ field }) => (
                           <FormItem><FormLabel>Fecha de Inicio</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem>
                       )} />
                   </div>
                   
-                  {status === 'completed' && (
-                    <div className="space-y-4 pt-4 border-t">
-                      <p className="text-sm font-medium">Detalles de Fin</p>
-                      <div className="grid grid-cols-2 gap-4">
-                          <FormField control={form.control} name="endOdometer" render={({ field }) => (
-                              <FormItem><FormLabel>Odómetro Final</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                          )} />
-                          <FormField control={form.control} name="endDate" render={({ field }) => (
-                             <FormItem><FormLabel>Fecha de Fin</FormLabel><FormControl><Input type="datetime-local" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                          )} />
-                      </div>
-                    </div>
-                  )}
+                  <Separator />
 
-                  <div className="space-y-4 pt-4 border-t">
-                      <Label>Gastos del Viaje</Label>
-                      <div className="space-y-2">
-                        {fields.map((field, index) => (
-                          <div key={field.id} className="flex items-center gap-2">
-                            <FormField
-                              control={control}
-                              name={`expenses.${index}.description`}
-                              render={({ field }) => (
-                                <Input {...field} placeholder="Descripción (ej: Peaje)" className="flex-1" />
-                              )}
-                            />
-                            <FormField
-                              control={control}
-                              name={`expenses.${index}.amount`}
-                              render={({ field }) => (
-                                  <Input {...field} type="text" placeholder="$" className="w-24" />
-                              )}
-                            />
-                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                  <div className="space-y-4">
+                    <Label>Etapas del Viaje</Label>
+                     {fields.map((field, index) => {
+                        const previousOdometer = index > 0 ? stages![index - 1].stageEndOdometer : startOdometer;
+                         return (
+                            <div key={field.id} className="p-4 border rounded-lg space-y-4 bg-muted/30">
+                                <div className="flex justify-between items-center">
+                                    <p className="font-semibold text-primary">Etapa {index + 1}</p>
+                                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                     <FormField control={control} name={`stages.${index}.stageEndOdometer`} render={({ field }) => (
+                                        <FormItem><FormLabel>Odómetro Etapa</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormDescription className="text-xs">Anterior: {previousOdometer.toLocaleString()} km</FormDescription><FormMessage /></FormItem>
+                                    )} />
+                                     <FormField control={control} name={`stages.${index}.stageEndDate`} render={({ field }) => (
+                                        <FormItem><FormLabel>Fecha Etapa</FormLabel><FormControl><Input type="datetime-local" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                                    )} />
+                                </div>
+                                 <FormField control={control} name={`stages.${index}.notes`} render={({ field }) => (
+                                    <FormItem><FormLabel>Notas de la Etapa</FormLabel><FormControl><Textarea placeholder="Notas específicas para esta etapa..." {...field} /></FormControl><FormMessage /></FormItem>
+                                )}/>
+                                <div>
+                                    <Label>Gastos de la Etapa</Label>
+                                    <StageExpenses stageIndex={index} />
+                                </div>
+                            </div>
+                        )
+                     })}
+                     {trip?.status !== 'completed' && (
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <Button type="button" variant="secondary" className="w-full" onClick={handleAddStage}>
+                                <ChevronsRight className="mr-2 h-4 w-4" /> Añadir Etapa
                             </Button>
-                          </div>
-                        ))}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() => append({ description: "", amount: '' })}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Añadir Gasto
-                      </Button>
-                  </div>
-                  
-                  {status === 'completed' && (
-                    <div className="space-y-2 pt-4 border-t">
-                        <Label>Tipo de Cambio (ARS por USD)</Label>
-                        <div className="flex items-center gap-2">
-                            <FormField
-                            control={form.control}
-                            name="exchangeRate"
-                            render={({ field }) => (
-                                <FormItem className="flex-1">
-                                <FormControl>
-                                    <Input type="text" placeholder="Valor del dólar al finalizar" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                            />
-                            <Button type="button" variant="outline" size="icon" onClick={handleFetchRate} disabled={isFetchingRate}>
-                                {isFetchingRate ? <Loader2 className="h-4 w-4 animate-spin"/> : <Wand2 className="h-4 w-4" />}
-                                <span className="sr-only">Obtener tipo de cambio actual</span>
+                            <Button type="button" variant="default" className="w-full" onClick={handleFinalizeTrip}>
+                                <Flag className="mr-2 h-4 w-4" /> Finalizar Viaje
                             </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground">Este valor se guardará para el cálculo de costos históricos.</p>
-                    </div>
-                  )}
+                     )}
+                     {fields.length === 0 && trip?.status !== 'completed' && <p className="text-xs text-muted-foreground text-center">Añade etapas a tu viaje o finalízalo.</p>}
+
+                  </div>
               </div>
             </div>
 
@@ -383,5 +350,55 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         </Form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function StageExpenses({ stageIndex }: { stageIndex: number }) {
+  const { control } = useFormContext<FormValues>();
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `stages.${stageIndex}.expenses`
+  });
+
+  return (
+    <div className="space-y-2 mt-2">
+      {fields.map((field, expenseIndex) => (
+        <div key={field.id} className="flex items-start gap-2">
+          <FormField
+            control={control}
+            name={`stages.${stageIndex}.expenses.${expenseIndex}.description`}
+            render={({ field }) => (
+                <FormItem className="flex-1">
+                    <FormControl><Input {...field} placeholder="Descripción (ej: Peaje)" /></FormControl>
+                    <FormMessage className="text-xs" />
+                </FormItem>
+            )}
+          />
+          <FormField
+            control={control}
+            name={`stages.${stageIndex}.expenses.${expenseIndex}.amount`}
+            render={({ field }) => (
+                <FormItem className="w-28">
+                    <FormControl><Input {...field} type="text" placeholder="$" /></FormControl>
+                    <FormMessage className="text-xs" />
+                </FormItem>
+            )}
+          />
+          <Button type="button" variant="ghost" size="icon" onClick={() => remove(expenseIndex)} className="shrink-0">
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mt-2"
+        onClick={() => append({ description: "", amount: '' })}
+      >
+        <Plus className="mr-2 h-4 w-4" />
+        Gasto
+      </Button>
+    </div>
   );
 }
