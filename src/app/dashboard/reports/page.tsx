@@ -135,7 +135,7 @@ export default function ReportsPage() {
             const odometers = logsInMonth.map(log => log.odometer);
             const firstOdo = Math.min(...odometers);
             const lastOdo = Math.max(...odometers);
-            monthlyData[i].km = lastOdo - firstOdo;
+            monthlyData[i].km = Math.abs(lastOdo - firstOdo);
         } else if (logsInMonth.length === 1) {
             monthlyData[i].km = logsInMonth[0].distanceTraveled || 0;
         }
@@ -155,8 +155,12 @@ export default function ReportsPage() {
         totalServicesCost,
         totalAnnualCost
     }
+    
+    // Sort logs chronologically for charts
+    const sortedLogsForCharts = [...logsInYear].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    return { availableYears: sortedYears, annualData: monthlyData, logsForSelectedYear: logsInYear, annualStats: stats };
+
+    return { availableYears: sortedYears, annualData: monthlyData, logsForSelectedYear: sortedLogsForCharts, annualStats: stats };
   }, [allFuelLogsData, allServicesData, selectedYear]);
 
   useEffect(() => {
