@@ -75,6 +75,7 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
         const detailedCostsARS = calculateTotalCostInARS(costPerKmUSD, fuelCostPerKmARS, exchangeRate);
         
         let lastOdometer = trip.startOdometer;
+        let lastDate = trip.startDate;
         const processedStages = (trip.stages || []).map(stage => {
             const kmTraveled = stage.stageEndOdometer - lastOdometer;
             const otherExpenses = (stage.expenses || []).reduce((acc, exp) => acc + exp.amount, 0);
@@ -87,7 +88,15 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
             const stageFuelPlusVariablePlusExpenses = stageFuelCost + stageVariableCost + otherExpenses;
             const stageTotalRealCost = (kmTraveled * detailedCostsARS.totalCostPerKm_ARS) + otherExpenses;
 
+            let stageDuration = "N/A";
+            if (stage.stageEndDate && lastDate) {
+                const hours = differenceInHours(new Date(stage.stageEndDate), new Date(lastDate));
+                const minutes = differenceInMinutes(new Date(stage.stageEndDate), new Date(lastDate)) % 60;
+                stageDuration = `${hours}h ${minutes}m`;
+            }
+
             lastOdometer = stage.stageEndOdometer;
+            lastDate = stage.stageEndDate;
             
             return { 
                 ...stage, 
@@ -96,6 +105,7 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
                 stageFuelPlusExpenses,
                 stageFuelPlusVariablePlusExpenses,
                 stageTotalRealCost,
+                stageDuration
             };
         });
 
@@ -173,10 +183,10 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
                     {processedStages.map((stage, index) => (
                         <div key={stage.id} className="p-3 rounded-lg bg-muted/40 border text-sm">
                             <div className="flex justify-between items-start">
-                                <p className="font-semibold text-primary flex items-center gap-2">
+                                <div className="font-semibold text-primary flex items-center gap-2">
                                     <ChevronsRight className="h-5 w-5" />
-                                    Etapa {index + 1}: {stage.kmTraveled.toLocaleString()} km
-                                </p>
+                                    Etapa {index + 1}: {stage.kmTraveled.toLocaleString()} km ({stage.stageDuration})
+                                </div>
                             </div>
                             <div className="pl-7 mt-2 space-y-2">
                                 {stage.notes && <p className="text-xs italic text-muted-foreground">Notas: {stage.notes}</p>}
@@ -284,7 +294,7 @@ export default function CompletedTrips({ trips, vehicle, allFuelLogs }: Complete
 
   const getTripSummary = (trip: Trip) => {
     if (!trip.stages || trip.stages.length === 0) {
-      // @ts-ignore - endOdometer might not exist on new Trip type, but does on old data
+      // @ts-ignore - Support for old trips without stages
       const distance = (trip.endOdometer || trip.startOdometer) - trip.startOdometer;
       // @ts-ignore
       const endDate = trip.endDate || trip.startDate;
@@ -335,3 +345,4 @@ export default function CompletedTrips({ trips, vehicle, allFuelLogs }: Complete
     </Card>
   );
 }
+
