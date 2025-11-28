@@ -5,7 +5,7 @@
 import type { Trip, ProcessedFuelLog, Vehicle, TripStage } from '@/lib/types';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Map, Edit, Trash2, Clock, Wallet, Route, User, Wand2, Loader2, DollarSign, ChevronsRight, Calculator } from 'lucide-react';
+import { Map, Edit, Trash2, Clock, Wallet, Route, User, Wand2, Loader2, DollarSign, ChevronsRight, Calculator, TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import { formatDateTime, formatCurrency, parseCurrency } from '@/lib/utils';
 import AddTripDialog from '../dashboard/add-trip-dialog';
 import { Button } from '../ui/button';
@@ -105,7 +105,10 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
                 stageFuelPlusExpenses,
                 stageFuelPlusVariablePlusExpenses,
                 stageTotalRealCost,
-                stageDuration
+                stageDuration,
+                stageFixedCost,
+                stageVariableCost,
+                stageFuelCost,
             };
         });
 
@@ -137,6 +140,9 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
             fuelPlusVariablePlusExpenses,
             totalRealCostPlusExpenses,
             detailedCostsARS,
+            fixedCostForTrip,
+            variableCostForTrip,
+            fuelCostForTrip
         };
 
     }, [trip, vehicle, allFuelLogs, exchangeRate, lastFuelLog]);
@@ -149,7 +155,10 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
         fuelPlusExpenses,
         fuelPlusVariablePlusExpenses,
         totalRealCostPlusExpenses,
-        detailedCostsARS
+        detailedCostsARS,
+        fixedCostForTrip,
+        variableCostForTrip,
+        fuelCostForTrip,
      } = tripCalculations;
     const lastOdometerInTrip = (trip.stages && trip.stages.length > 0) ? trip.stages[trip.stages.length-1].stageEndOdometer : trip.startOdometer;
 
@@ -243,22 +252,42 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
                         Ingresa un tipo de cambio para ver los costos totales.
                     </p>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="p-3 rounded-lg border">
-                            <p className="text-xs text-muted-foreground">CC x KmR + GV</p>
-                            <p className="font-semibold text-lg">{formatCurrency(fuelPlusExpenses)}</p>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                            <div className="p-2 rounded bg-muted/30">
+                                <p className="font-semibold text-muted-foreground">C. Fijos (CF)</p>
+                                <div className="flex justify-between"><span>CF/km:</span> <span>{formatCurrency(detailedCostsARS.fixedCostPerKm_ARS)}</span></div>
+                                <div className="flex justify-between"><span>CF x KmR:</span> <span>{formatCurrency(fixedCostForTrip)}</span></div>
+                            </div>
+                            <div className="p-2 rounded bg-muted/30">
+                                <p className="font-semibold text-muted-foreground">C. Variables (CV)</p>
+                                <div className="flex justify-between"><span>CV/km:</span> <span>{formatCurrency(detailedCostsARS.variableCostPerKm_ARS)}</span></div>
+                                <div className="flex justify-between"><span>CV x KmR:</span> <span>{formatCurrency(variableCostForTrip)}</span></div>
+                            </div>
+                             <div className="p-2 rounded bg-muted/30">
+                                <p className="font-semibold text-muted-foreground">C. Combustible (CC)</p>
+                                <div className="flex justify-between"><span>CC/km:</span> <span>{formatCurrency(detailedCostsARS.fuelCostPerKm_ARS)}</span></div>
+                                <div className="flex justify-between"><span>CC x KmR:</span> <span>{formatCurrency(fuelCostForTrip)}</span></div>
+                            </div>
                         </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="p-3 rounded-lg border">
-                            <p className="text-xs text-muted-foreground">CC x KmR + CV x KmR + GV</p>
-                            <p className="font-semibold text-lg">{formatCurrency(fuelPlusVariablePlusExpenses)}</p>
-                        </div>
-                            <div className="p-3 rounded-lg border">
-                            <p className="text-xs text-muted-foreground">CTR/km</p>
-                            <p className="font-semibold text-lg">{formatCurrency(detailedCostsARS.totalCostPerKm_ARS || 0)}</p>
-                        </div>
-                        <div className="p-3 rounded-lg border border-primary/50 bg-primary/10">
-                            <p className="text-xs text-primary/80">CTR x KmR + GV (Costo Total Real)</p>
-                            <p className="font-semibold text-lg text-primary">{formatCurrency(totalRealCostPlusExpenses)}</p>
+                                <p className="text-xs text-muted-foreground">CC x KmR + GV</p>
+                                <p className="font-semibold text-lg">{formatCurrency(fuelPlusExpenses)}</p>
+                            </div>
+                             <div className="p-3 rounded-lg border">
+                                <p className="text-xs text-muted-foreground">CC x KmR + CV x KmR + GV</p>
+                                <p className="font-semibold text-lg">{formatCurrency(fuelPlusVariablePlusExpenses)}</p>
+                            </div>
+                             <div className="p-3 rounded-lg border">
+                                <p className="text-xs text-muted-foreground">CTR/km</p>
+                                <p className="font-semibold text-lg">{formatCurrency(detailedCostsARS.totalCostPerKm_ARS || 0)}</p>
+                            </div>
+                            <div className="p-3 rounded-lg border border-primary/50 bg-primary/10">
+                                <p className="text-xs text-primary/80">CTR x KmR + GV (Costo Total Real)</p>
+                                <p className="font-semibold text-lg text-primary">{formatCurrency(totalRealCostPlusExpenses)}</p>
+                            </div>
                         </div>
                     </div>
                 )}
