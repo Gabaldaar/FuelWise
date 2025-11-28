@@ -201,7 +201,7 @@ function TripDetails({ trip, vehicle, allFuelLogs }: TripDetailsProps) {
                                 {stage.notes && <p className="text-xs italic text-muted-foreground">Notas: {stage.notes}</p>}
                                 {(stage.expenses && stage.expenses.length > 0) && (
                                     <div className="pt-1 text-xs">
-                                        <p className="font-medium">Gastos de la Etapa:</p>
+                                        <p className="font-medium">Gastos de la Etapa (GV: {formatCurrency(stage.otherExpenses)})</p>
                                         <ul className="text-muted-foreground list-disc pl-5 mt-1">
                                             {stage.expenses.map((expense, i) => (
                                                 <li key={i} className="flex justify-between">
@@ -324,7 +324,7 @@ export default function CompletedTrips({ trips, vehicle, allFuelLogs }: Complete
   const getTripSummary = (trip: Trip) => {
     if (!trip.stages || trip.stages.length === 0) {
       // @ts-ignore - Support for old trips without stages
-      const distance = (trip.endOdometer || trip.startOdometer) - trip.startOdometer;
+      const distance = trip.endOdometer ? trip.endOdometer - trip.startOdometer : 0;
       // @ts-ignore
       const endDate = trip.endDate || trip.startDate;
       return { distance, endDate };
@@ -374,4 +374,5 @@ export default function CompletedTrips({ trips, vehicle, allFuelLogs }: Complete
     </Card>
   );
 }
+
 
