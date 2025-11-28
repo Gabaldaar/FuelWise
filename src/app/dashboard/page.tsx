@@ -21,36 +21,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import AddVehicleDialog from '@/components/dashboard/add-vehicle-dialog';
+import { processFuelLogs } from '@/lib/vehicle-calculations';
 
-
-function processFuelLogs(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
-  // Sort logs by odometer ascending to calculate consumption correctly
-  const sortedLogsAsc = logs.sort((a, b) => a.odometer - b.odometer);
-
-  const calculatedLogs = sortedLogsAsc.map((log, index) => {
-    if (index === 0) return { ...log };
-    
-    const prevLog = sortedLogsAsc[index - 1];
-    
-    const distanceTraveled = log.odometer - prevLog.odometer;
-    
-    // Only calculate consumption if the previous log was a fill-up
-    // and the current log is NOT marked as having a missed previous fill-up.
-    if (prevLog && prevLog.isFillUp && !log.missedPreviousFillUp) {
-      const consumption = distanceTraveled > 0 && log.liters > 0 ? distanceTraveled / log.liters : 0;
-      return {
-        ...log,
-        distanceTraveled,
-        consumption: parseFloat(consumption.toFixed(2)),
-      };
-    }
-    
-    return { ...log, distanceTraveled };
-  });
-
-  // Return logs sorted descending by date for display
-  return calculatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-}
 
 export default function DashboardPage() {
   const { selectedVehicle: vehicle, isLoading: isVehicleLoading } = useVehicles();

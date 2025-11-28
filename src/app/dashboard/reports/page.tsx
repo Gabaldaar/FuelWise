@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -19,22 +20,8 @@ import { getOfficialDolarRate } from '@/ai/flows/get-exchange-rate';
 import { calculateCostsPerKm, calculateTotalCostInARS } from '@/lib/cost-calculator';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
+import { processFuelLogs } from '@/lib/vehicle-calculations';
 
-
-function processFuelLogs(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
-  const sortedLogsAsc = logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const calculatedLogs = sortedLogsAsc.map((log, index) => {
-    if (index === 0) return { ...log };
-    const prevLog = sortedLogsAsc[index - 1];
-    if (prevLog && prevLog.isFillUp && !log.missedPreviousFillUp) {
-      const distanceTraveled = log.odometer - prevLog.odometer;
-      const consumption = distanceTraveled > 0 && log.liters > 0 ? distanceTraveled / log.liters : 0;
-      return { ...log, distanceTraveled, consumption: parseFloat(consumption.toFixed(2)) };
-    }
-    return { ...log, distanceTraveled: log.odometer - prevLog.odometer };
-  });
-  return calculatedLogs;
-}
 
 export default function ReportsPage() {
   const { selectedVehicle: vehicle } = useVehicles();

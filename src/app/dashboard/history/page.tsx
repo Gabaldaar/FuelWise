@@ -43,6 +43,7 @@ import { DateRangePicker } from '@/components/reports/date-range-picker';
 import type { DateRange } from 'react-day-picker';
 import EstimatedRefuelCard from '@/components/dashboard/estimated-refuel-card';
 import { Loader2 } from 'lucide-react';
+import { processFuelLogs } from '@/lib/vehicle-calculations';
 
 type TimelineHistoryItem = {
     type: 'fuel' | 'service' | 'trip' | 'missed-log';
@@ -50,34 +51,6 @@ type TimelineHistoryItem = {
     date: string;
     data: ProcessedFuelLog | ProcessedServiceReminder | Trip | {};
 };
-
-// This function needs to be outside the component to be used in useMemo without causing dependency issues
-function processFuelLogsForConsumption(logs: ProcessedFuelLog[]): ProcessedFuelLog[] {
-  // Sort logs by odometer ascending to calculate consumption correctly
-  const sortedLogsAsc = [...logs].sort((a, b) => a.odometer - b.odometer);
-
-  const calculatedLogs = sortedLogsAsc.map((log, index) => {
-    if (index === 0) return { ...log };
-    
-    const prevLog = sortedLogsAsc[index - 1];
-    
-    const distanceTraveled = log.odometer - prevLog.odometer;
-    
-    if (prevLog && prevLog.isFillUp && !log.missedPreviousFillUp) {
-      const consumption = distanceTraveled > 0 && log.liters > 0 ? distanceTraveled / log.liters : 0;
-      return {
-        ...log,
-        distanceTraveled,
-        consumption: parseFloat(consumption.toFixed(2)),
-      };
-    }
-    
-    return { ...log, distanceTraveled };
-  });
-
-  // Return logs sorted descending for display (by date, which is the original query order)
-  return calculatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-}
 
 
 export default function HistoryPage() {
@@ -107,7 +80,7 @@ export default function HistoryPage() {
     if (!user || !vehicle) return null;
     return query(
       collection(firestore, 'vehicles', vehicle.id, 'trips'),
-      orderBy('endDate', 'desc')
+      orderBy('startDate', 'desc')
     );
   }, [firestore, user, vehicle]);
   
@@ -117,7 +90,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     if (vehicle && allFuelLogs) {
-      const processedLogs = processFuelLogsForConsumption(allFuelLogs);
+      const processedLogs = processFuelLogs(allFuelLogs);
       const consumptionLogs = processedLogs.filter(log => log.consumption && log.consumption > 0);
       const calculatedAvg = consumptionLogs.length > 0
         ? consumptionLogs.reduce((acc, log) => acc + (log.consumption || 0), 0) / consumptionLogs.length
@@ -203,9 +176,10 @@ export default function HistoryPage() {
     });
 
     (trips || []).forEach(trip => {
-      if (trip.status === 'completed' && trip.endDate && trip.endOdometer) {
-        if (!from || !to || (new Date(trip.endDate) >= from && new Date(trip.endDate) <= to)) {
-            combined.push({ type: 'trip', sortKey: trip.endOdometer, date: trip.endDate, data: trip });
+      if (trip.status === 'completed' && trip.stages?.length > 0) {
+        const lastStage = trip.stages[trip.stages.length - 1];
+        if (!from || !to || (new Date(lastStage.stageEndDate) >= from && new Date(lastStage.stageEndDate) <= to)) {
+            combined.push({ type: 'trip', sortKey: lastStage.stageEndOdometer, date: lastStage.stageEndDate, data: trip });
          }
       }
     });
