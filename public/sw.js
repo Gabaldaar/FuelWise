@@ -1,43 +1,51 @@
 // public/sw.js
 
 self.addEventListener('push', event => {
-  // Encadenamos la promesa para manejar los datos asíncronos correctamente.
   const promiseChain = event.data.json().then(data => {
     const options = {
       body: data.body,
       icon: data.icon || '/icon-192x192.png',
       badge: '/icon-192x192.png',
-      // El tag agrupa notificaciones. Una nueva con el mismo tag reemplaza a la anterior.
-      tag: data.tag, 
-      // Permite que una nueva notificación con el mismo tag vuelva a alertar al usuario (vibración/sonido).
-      renotify: true,
+      tag: data.tag, // Agrupa notificaciones
+      renotify: true, // Permite que nuevas notificaciones con el mismo tag vuelvan a sonar/vibrar
+      data: {
+        url: data.url, // Almacena la URL para usarla en el evento 'click'
+      },
     };
     return self.registration.showNotification(data.title, options);
   });
-
   event.waitUntil(promiseChain);
 });
 
 
 self.addEventListener('notificationclick', event => {
-  event.notification.close();
+  const notification = event.notification;
+  const urlToOpen = notification.data?.url || '/'; // Usa la URL de la notificación o la raíz como fallback
 
-  // Esta lógica abre la aplicación o la enfoca si ya está abierta.
-  event.waitUntil(
-    clients.matchAll({ type: 'window' }).then(clientsArr => {
-      const hadWindowToFocus = clientsArr.some(windowClient =>
-        windowClient.url.includes(self.location.origin)
-          ? (windowClient.focus(), true)
-          : false
-      );
+  notification.close();
 
-      if (!hadWindowToFocus) {
-        clients.openWindow(self.location.origin).then(client => (client ? client.focus() : null));
+  // Esta lógica es más robusta en móviles. Le dice al navegador que abra la URL.
+  // Si la app ya está abierta, el navegador la pondrá en foco.
+  const promiseChain = clients.matchAll({
+    type: 'window',
+    includeUncontrolled: true,
+  }).then((clientList) => {
+    if (clientList.length > 0) {
+      // Intenta encontrar un cliente ya abierto en la misma URL para enfocarlo.
+      let client = clientList.find(c => c.url === urlToOpen && 'focus' in c);
+      if (!client) {
+        // Si no lo encuentra, toma el primer cliente disponible.
+        client = clientList[0];
       }
-    })
-  );
-});
+       if (client && 'focus' in client) {
+          // Navega el cliente existente a la URL deseada y lo enfoca.
+          client.navigate(urlToOpen);
+          return client.focus();
+       }
+    }
+    // Si no hay clientes o no se pueden enfocar, abre una nueva ventana.
+    return clients.openWindow(urlToOpen);
+  });
 
-// El resto de la lógica del service worker (cache, etc.) se mantiene.
-// Este archivo está auto-generado por next-pwa, por lo que solo debemos añadir
-// los listeners para 'push' y 'notificationclick'. El resto del código lo gestiona el plugin.
+  event.waitUntil(promiseChain);
+});

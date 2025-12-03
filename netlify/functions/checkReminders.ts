@@ -168,7 +168,8 @@ export const handler: Handler = async () => {
                 title, 
                 body, 
                 icon: vehicleData.imageUrl || '/icon-192x192.png',
-                tag: reminder.id
+                tag: reminder.id,
+                url: `/dashboard/services?vehicle=${vehicleId}` // <-- CAMBIO AÑADIDO
             });
             
             console.log(`[Cron] Preparing to send notification for reminder: ${reminder.id}`);
