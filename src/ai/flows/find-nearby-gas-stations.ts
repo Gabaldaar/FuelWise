@@ -24,10 +24,15 @@ export type GasStationOutput = z.infer<typeof GasStationOutputSchema>;
 
 // This is the function we will call directly from our React component.
 export async function findNearbyGasStations(input: GasStationInput): Promise<GasStationOutput[]> {
-  // Enhanced check for the API key
-  if (!process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY === '') {
-    console.error("[Gas Station Flow] FATAL: GOOGLE_MAPS_API_KEY environment variable is not set or is empty.");
-    throw new Error("El servicio de mapas no está configurado en el servidor. Esta función está deshabilitada.");
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+
+  // Enhanced check for the API key, with added logging for diagnostics
+  if (!apiKey || apiKey === '') {
+    console.error("[Gas Station Flow] DIAGNOSTIC: GOOGLE_MAPS_API_KEY environment variable is not set or is empty.");
+    throw new Error("El servicio de mapas no está configurado en el servidor. La clave de API no fue encontrada.");
+  } else {
+    // Log a portion of the key to verify it's being loaded correctly without exposing it.
+    console.log(`[Gas Station Flow] DIAGNOSTIC: Using API Key starting with "${apiKey.substring(0, 4)}...".`);
   }
   
   try {
@@ -38,7 +43,7 @@ export async function findNearbyGasStations(input: GasStationInput): Promise<Gas
         location: { lat: input.latitude, lng: input.longitude },
         radius: input.radius,
         type: 'gas_station',
-        key: process.env.GOOGLE_MAPS_API_KEY!,
+        key: apiKey,
       },
     });
 
