@@ -96,10 +96,14 @@ export async function findNearbyGasStations(input: GasStationInput): Promise<Gas
   } catch (error: any) {
       // This will catch network errors or errors from the google-maps-services-js client itself
       console.error("[Gas Station Flow] An unexpected error occurred. Full error:", JSON.stringify(error, null, 2));
-      
-      // Check if it's an Axios-style error from the library
-      if (error.response?.data?.error_message) {
-        throw new Error(`Error del servicio de mapas: ${error.response.data.error_message}`);
+
+      const apiErrorMessage = error.response?.data?.error_message;
+  
+      if (apiErrorMessage) {
+          if (apiErrorMessage.includes("You must enable Billing")) {
+              throw new Error("Se requiere activar la facturación en el proyecto de Google Cloud para usar esta función. Aunque es un requisito, Google Maps ofrece un amplio nivel de uso gratuito.");
+          }
+          throw new Error(`Error del servicio de mapas: ${apiErrorMessage}`);
       }
       
       // Fallback generic error
