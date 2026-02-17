@@ -25,49 +25,62 @@ export type GasStationOutput = z.infer<typeof GasStationOutputSchema>;
 // This is the function we will call directly from our React component.
 export async function findNearbyGasStations(input: GasStationInput): Promise<GasStationOutput[]> {
   if (!process.env.GOOGLE_MAPS_API_KEY) {
-    throw new Error("Google Maps API key is not configured. Please set the GOOGLE_MAPS_API_KEY environment variable.");
+    console.error("[Gas Station Flow] FATAL: GOOGLE_MAPS_API_KEY environment variable is not set.");
+    throw new Error("El servicio de mapas no está configurado en el servidor. Esta función está deshabilitada.");
   }
   
-  const client = new Client({});
+  try {
+    const client = new Client({});
 
-  const response = await client.placesNearby({
-    params: {
-      location: { lat: input.latitude, lng: input.longitude },
-      radius: input.radius,
-      type: 'gas_station',
-      key: process.env.GOOGLE_MAPS_API_KEY!,
-    },
-  });
+    const response = await client.placesNearby({
+      params: {
+        location: { lat: input.latitude, lng: input.longitude },
+        radius: input.radius,
+        type: 'gas_station',
+        key: process.env.GOOGLE_MAPS_API_KEY!,
+      },
+    });
 
-  if (response.data.status !== 'OK') {
-    console.error('Places API error:', response.data.error_message);
-    throw new Error(`Failed to fetch gas stations: ${response.data.status}`);
+    // Handle non-OK statuses that are not ZERO_RESULTS
+    if (response.data.status !== 'OK' && response.data.status !== 'ZERO_RESULTS') {
+      console.error('Places API error:', response.data.error_message || response.data.status);
+      throw new Error(`El servicio de mapas respondió con un error: ${response.data.status}`);
+    }
+
+    if (response.data.results.length === 0) {
+      return []; // No need to map, just return an empty array.
+    }
+
+    const stations: GasStationOutput[] = (response.data.results as Place[])
+      .map(place => {
+        const location = place.geometry?.location;
+        if (!location) return null;
+
+        // Calculate distance (this is a simplified haversine distance calculation)
+        const toRad = (x: number) => x * Math.PI / 180;
+        const R = 6371; // Earth radius in km
+        const dLat = toRad(location.lat - input.latitude);
+        const dLon = toRad(location.lng - input.longitude);
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(toRad(input.latitude)) * Math.cos(toRad(location.lat)) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distanceInKm = R * c;
+
+        return {
+          name: place.name || 'N/A',
+          address: place.vicinity || 'Dirección no disponible',
+          distance: `${distanceInKm.toFixed(1)} km`,
+          mapsUrl: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place.name || '')}&destination_place_id=${place.place_id}`,
+        };
+      })
+      .filter((s): s is GasStationOutput => s !== null);
+
+    return stations.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
+
+  } catch (error: any) {
+      console.error("[Gas Station Flow] An unexpected error occurred:", error.message);
+      // Re-throw a generic but user-friendly error
+      throw new Error("Ocurrió un error inesperado al contactar con el servicio de mapas.");
   }
-
-  const stations: GasStationOutput[] = (response.data.results as Place[])
-    .map(place => {
-      const location = place.geometry?.location;
-      if (!location) return null;
-
-      // Calculate distance (this is a simplified haversine distance calculation)
-      const toRad = (x: number) => x * Math.PI / 180;
-      const R = 6371; // Earth radius in km
-      const dLat = toRad(location.lat - input.latitude);
-      const dLon = toRad(location.lng - input.longitude);
-      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(toRad(input.latitude)) * Math.cos(toRad(location.lat)) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distanceInKm = R * c;
-
-      return {
-        name: place.name || 'N/A',
-        address: place.vicinity || 'Dirección no disponible',
-        distance: `${distanceInKm.toFixed(1)} km`,
-        mapsUrl: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place.name || '')}&destination_place_id=${place.place_id}`,
-      };
-    })
-    .filter((s): s is GasStationOutput => s !== null);
-
-  return stations.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
 }
