@@ -1,6 +1,3 @@
-
-
-
 export type Vehicle = {
   id: string;
   make: string;
@@ -36,10 +33,10 @@ export type FuelLog = {
   odometer: number;
   fuelType: string;
   pricePerLiter: number;
-  pricePerLiterUsd?: number;
+  pricePerLiterUsd?: number | null;
   totalCost: number;
-  totalCostUsd?: number;
-  exchangeRate?: number;
+  totalCostUsd?: number | null;
+  exchangeRate?: number | null;
   liters: number;
   gasStation: string;
   isFillUp: boolean;
@@ -92,7 +89,7 @@ export type Trip = {
     startOdometer: number;
     status: 'active' | 'completed';
     stages: TripStage[];
-    exchangeRate?: number; // Overall dollar exchange rate for cost calculation consistency
+    exchangeRate?: number | null;
 };
 
 
@@ -132,3 +129,4 @@ export type TimelineItem = {
     
 
     
+

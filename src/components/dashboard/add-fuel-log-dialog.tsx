@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -158,7 +157,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
 
   useEffect(() => {
     if (open) {
-        const toLocaleString = (num: number | undefined) => num?.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '';
+        const toLocaleString = (num: number | null | undefined) => num?.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '';
 
         const defaultVals = {
         date: fuelLog?.date ? new Date(fuelLog.date) : new Date(),
@@ -241,11 +240,11 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
 
     const totalCostNum = parseCurrency(values.totalCost);
     const pricePerLiterNum = parseCurrency(values.pricePerLiter);
-    const exchangeRateNum = values.exchangeRate ? parseCurrency(values.exchangeRate) : 0;
+    const exchangeRateNum = values.exchangeRate ? parseCurrency(values.exchangeRate) : null;
 
-    let totalCostUsd: number | undefined;
-    let pricePerLiterUsd: number | undefined;
-    if (exchangeRateNum > 0) {
+    let totalCostUsd: number | null = null;
+    let pricePerLiterUsd: number | null = null;
+    if (exchangeRateNum && exchangeRateNum > 0) {
         totalCostUsd = totalCostNum / exchangeRateNum;
         pricePerLiterUsd = pricePerLiterNum / exchangeRateNum;
     }
@@ -261,7 +260,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
         totalCost: totalCostNum,
         liters: parseCurrency(values.liters),
         pricePerLiter: pricePerLiterNum,
-        exchangeRate: exchangeRateNum > 0 ? exchangeRateNum : undefined,
+        exchangeRate: exchangeRateNum,
         totalCostUsd,
         pricePerLiterUsd,
     };

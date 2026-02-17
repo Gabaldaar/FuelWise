@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -160,7 +158,7 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
   useEffect(() => {
     if (open) {
       const now = toDateTimeLocalString(new Date());
-      const toLocaleString = (num: number | undefined) => num?.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '';
+      const toLocaleString = (num: number | undefined | null) => num?.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '';
 
       const tripExchangeRate = trip?.exchangeRate;
 
@@ -258,10 +256,10 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         startDate: new Date(values.startDate).toISOString(),
     };
     
-    if (values.exchangeRate) {
+    if (values.exchangeRate && parseCurrency(values.exchangeRate) > 0) {
         tripData.exchangeRate = parseCurrency(values.exchangeRate);
     } else {
-        tripData.exchangeRate = undefined;
+        tripData.exchangeRate = null;
     }
 
     setDocumentNonBlocking(tripRef, tripData, { merge: true });
