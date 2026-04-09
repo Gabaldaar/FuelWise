@@ -1,15 +1,17 @@
-
 'use client';
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Car, Fuel, Menu, LogOut, Settings, Wrench, History, Route, BarChart } from 'lucide-react';
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import type { User } from '@/lib/types';
-import { doc } from 'firebase/firestore';
+import type { User, ServiceReminder, Trip, ProcessedFuelLog } from '@/lib/types';
+import { doc, collection, query, where, orderBy, limit } from 'firebase/firestore';
 import Image from 'next/image';
+import { useMemo } from 'react';
+import { useVehicles } from '@/context/vehicle-context';
+import { differenceInDays } from 'date-fns';
 
 import {
   SidebarContent,
@@ -20,6 +22,7 @@ import {
   SidebarMenuButton,
   SidebarSeparator,
   useSidebar,
+  SidebarMenuBadge,
 } from '@/components/ui/sidebar';
 import { Button } from '../ui/button';
 
@@ -48,8 +51,10 @@ function UserInfo() {
   const { data: userProfile } = useDoc<User>(userProfileRef);
   
   const handleSignOut = () => {
-    signOut(auth);
-    router.push('/login');
+    if (auth) {
+        signOut(auth);
+        router.push('/login');
+    }
   };
 
   const getInitials = (name?: string) => {
@@ -78,6 +83,54 @@ function UserInfo() {
 export default function AppSidebar() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
+  const { selectedVehicle } = useVehicles();
+  const firestore = useFirestore();
+
+  // Fetch active trips
+  const activeTripsQuery = useMemoFirebase(() => {
+    if (!selectedVehicle) return null;
+    return query(
+      collection(firestore, 'vehicles', selectedVehicle.id, 'trips'),
+      where('status', '==', 'active')
+    );
+  }, [firestore, selectedVehicle]);
+  const { data: activeTrips } = useCollection<Trip>(activeTripsQuery);
+
+  // Fetch pending service reminders
+  const pendingRemindersQuery = useMemoFirebase(() => {
+    if (!selectedVehicle) return null;
+    return query(
+      collection(firestore, 'vehicles', selectedVehicle.id, 'service_reminders'),
+      where('isCompleted', '==', false)
+    );
+  }, [firestore, selectedVehicle]);
+  const { data: pendingReminders } = useCollection<ServiceReminder>(pendingRemindersQuery);
+
+  // Fetch last odometer reading
+  const lastFuelLogQuery = useMemoFirebase(() => {
+    if (!selectedVehicle) return null;
+    return query(
+      collection(firestore, 'vehicles', selectedVehicle.id, 'fuel_records'),
+      orderBy('odometer', 'desc'),
+      limit(1)
+    );
+  }, [firestore, selectedVehicle]);
+  const { data: lastFuelLog } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
+  const lastOdometer = lastFuelLog?.[0]?.odometer || 0;
+
+  // Calculate overdue services count
+  const overdueServicesCount = useMemo(() => {
+    if (!pendingReminders || !lastOdometer) return 0;
+    
+    return pendingReminders.filter(r => {
+      const kmsRemaining = r.dueOdometer ? r.dueOdometer - lastOdometer : null;
+      const daysRemaining = r.dueDate ? differenceInDays(new Date(r.dueDate), new Date()) : null;
+      const isOverdue = (kmsRemaining !== null && kmsRemaining < 0) || (daysRemaining !== null && daysRemaining < 0);
+      return isOverdue;
+    }).length;
+  }, [pendingReminders, lastOdometer]);
+
+  const activeTripsCount = activeTrips?.length || 0;
 
   const handleLinkClick = () => {
     setOpenMobile(false);
@@ -93,19 +146,34 @@ export default function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {menuItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <Link href={item.href} onClick={handleLinkClick}>
-                <SidebarMenuButton
-                  isActive={pathname.startsWith(item.href) && (item.href === '/dashboard' ? pathname === item.href : true)}
-                  tooltip={{ children: item.label }}
-                >
-                  <item.icon />
-                  <span>{item.label}</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-          ))}
+          {menuItems.map((item) => {
+            let badgeCount = 0;
+            if (item.href === '/dashboard/services' && overdueServicesCount > 0) {
+              badgeCount = overdueServicesCount;
+            }
+            if (item.href === '/dashboard/trips' && activeTripsCount > 0) {
+              badgeCount = activeTripsCount;
+            }
+
+            return (
+              <SidebarMenuItem key={item.href}>
+                <Link href={item.href} onClick={handleLinkClick}>
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith(item.href) && (item.href === '/dashboard' ? pathname === item.href : true)}
+                    tooltip={{ children: item.label }}
+                  >
+                    <item.icon />
+                    <span>{item.label}</span>
+                    {badgeCount > 0 && (
+                      <SidebarMenuBadge className="bg-destructive text-destructive-foreground">
+                        {badgeCount}
+                      </SidebarMenuBadge>
+                    )}
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
       <SidebarSeparator />
