@@ -1,4 +1,3 @@
-
 'use client';
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -13,7 +12,7 @@ export default function AppHeader() {
   
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 lg:px-8">
-      <SidebarTrigger className="md:hidden" />
+      <SidebarTrigger />
       
       <div className="flex flex-1 items-center gap-4">
         {selectedVehicle && (
@@ -33,9 +32,9 @@ export default function AppHeader() {
                   </div>
                 )}
               </div>
-              <div>
-                <h2 className="font-semibold text-lg">{selectedVehicle.make} {selectedVehicle.model}</h2>
-                <p className="text-xs text-muted-foreground">{selectedVehicle.plate}</p>
+              <div className="hidden xs:block">
+                <h2 className="font-semibold text-sm sm:text-lg leading-tight">{selectedVehicle.make} {selectedVehicle.model}</h2>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{selectedVehicle.plate}</p>
               </div>
            </div>
         )}

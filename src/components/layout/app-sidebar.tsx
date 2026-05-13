@@ -23,6 +23,7 @@ import {
   SidebarSeparator,
   useSidebar,
   SidebarMenuBadge,
+  SidebarRail,
 } from '@/components/ui/sidebar';
 import { Button } from '../ui/button';
 
@@ -65,15 +66,15 @@ function UserInfo() {
   if (!authUser) return null;
 
   return (
-    <div className='flex items-center gap-2'>
-      <Avatar className='h-8 w-8'>
+    <div className='flex items-center gap-2 px-1'>
+      <Avatar className='h-8 w-8 shrink-0'>
         <AvatarFallback>{getInitials(userProfile?.username)}</AvatarFallback>
       </Avatar>
-      <div className='flex flex-col text-sm truncate'>
+      <div className='flex flex-col text-sm truncate flex-1'>
         <span className='font-semibold text-sidebar-foreground truncate'>{userProfile?.username}</span>
-        <span className='text-xs text-muted-foreground truncate'>{authUser.email}</span>
+        <span className='text-[10px] text-muted-foreground truncate'>{authUser.email}</span>
       </div>
-      <Button variant="ghost" size="icon" onClick={handleSignOut} title="Cerrar sesión" className='ml-auto'>
+      <Button variant="ghost" size="icon" onClick={handleSignOut} title="Cerrar sesión" className='h-8 w-8 shrink-0'>
         <LogOut className="h-4 w-4" />
       </Button>
     </div>
@@ -139,9 +140,9 @@ export default function AppSidebar() {
   return (
     <>
       <SidebarHeader>
-        <div className="flex items-center gap-2">
-            <Image src="/icon-192x192.png" alt="MotorLog Logo" width={24} height={24} className="size-6" />
-            <h1 className="font-headline text-xl font-semibold">MotorLog</h1>
+        <div className="flex items-center gap-2 px-2 py-1">
+            <Image src="/icon-192x192.png" alt="MotorLog Logo" width={24} height={24} className="size-6 shrink-0" />
+            <h1 className="font-headline text-xl font-semibold truncate">MotorLog</h1>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -160,7 +161,7 @@ export default function AppSidebar() {
                 <Link href={item.href} onClick={handleLinkClick}>
                   <SidebarMenuButton
                     isActive={pathname.startsWith(item.href) && (item.href === '/dashboard' ? pathname === item.href : true)}
-                    tooltip={{ children: item.label }}
+                    tooltip={item.label}
                   >
                     <item.icon />
                     <span>{item.label}</span>
@@ -180,6 +181,7 @@ export default function AppSidebar() {
       <SidebarFooter>
         <UserInfo />
       </SidebarFooter>
+      <SidebarRail />
     </>
   );
 }
