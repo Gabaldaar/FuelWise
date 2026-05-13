@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { PreferencesProvider } from '@/context/preferences-context';
 import { Loader2, WifiOff } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import QuickActions from '@/components/dashboard/quick-actions';
 
 const ClientOnlyNotificationManager = dynamic(
   () => import('@/components/notifications/notification-manager'),
@@ -83,6 +84,7 @@ export default function DashboardLayout({
             <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-background">
                 {children}
             </main>
+            <QuickActions />
             </SidebarInset>
         </div>
         </SidebarProvider>
