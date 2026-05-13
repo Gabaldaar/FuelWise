@@ -63,12 +63,11 @@ const formSchema = z.object({
   stages: z.array(stageSchema).optional(),
   exchangeRate: z.string().optional(),
 }).refine(data => {
-    // Custom validation to ensure endOdometer of a stage is greater than the previous one
     if (data.stages && data.stages.length > 0) {
         let lastOdometer = data.startOdometer;
         for (const stage of data.stages) {
             if (stage.stageEndOdometer <= lastOdometer) {
-                return false; // Fails validation
+                return false;
             }
             lastOdometer = stage.stageEndOdometer;
         }
@@ -92,7 +91,6 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingRate, setIsFetchingRate] = useState(false);
-  const [activeStage, setActiveStage] = useState<'new' | 'final' | null>(null);
   const { toast } = useToast();
   const { user: authUser } = useUser();
   const firestore = useFirestore();
@@ -160,8 +158,6 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
       const now = toDateTimeLocalString(new Date());
       const toLocaleString = (num: number | undefined | null) => num?.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '';
 
-      const tripExchangeRate = trip?.exchangeRate;
-
       reset({
         tripType: trip?.tripType || '',
         destination: trip?.destination || '',
@@ -174,27 +170,15 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
             stageEndDate: toDateTimeLocalString(new Date(s.stageEndDate)),
             expenses: s.expenses?.map(e => ({description: e.description, amount: toLocaleString(e.amount)})) || []
         })) || [],
-        exchangeRate: tripExchangeRate ? toLocaleString(tripExchangeRate) : '',
+        exchangeRate: trip?.exchangeRate ? toLocaleString(trip.exchangeRate) : '',
       });
-
-      if (isEditing && (!tripExchangeRate || tripExchangeRate === 0)) {
-        handleFetchRate();
-      }
-
-      setActiveStage(null);
     }
-  }, [open, trip, reset, lastOdometer, isEditing, setValue]);
+  }, [open, trip, reset, lastOdometer]);
   
   const handleAddStage = async () => {
     const isFieldsValid = await trigger(["tripType", "destination", "startOdometer", "startDate"]);
-    if (!isFieldsValid) {
-        toast({
-            variant: "destructive",
-            title: "Faltan Datos",
-            description: "Por favor completa los detalles iniciales del viaje antes de añadir una etapa.",
-        });
-        return;
-    }
+    if (!isFieldsValid) return;
+    
     const newStageId = doc(collection(firestore, '_')).id;
     append({
         id: newStageId,
@@ -203,19 +187,12 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         notes: '',
         expenses: []
     });
-    setActiveStage('new');
   };
 
   const handleFinalizeTrip = async () => {
     const isFieldsValid = await trigger(["tripType", "destination", "startOdometer", "startDate"]);
-    if (!isFieldsValid) {
-        toast({
-            variant: "destructive",
-            title: "Faltan Datos",
-            description: "Por favor completa los detalles iniciales del viaje.",
-        });
-        return;
-    }
+    if (!isFieldsValid) return;
+
     const newStageId = doc(collection(firestore, '_')).id;
      append({
         id: newStageId,
@@ -225,27 +202,26 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         expenses: []
     });
     setValue('status', 'completed');
-    setActiveStage('final');
   }
 
   async function onSubmit(values: FormValues) {
-    if (!authUser || !userProfile) {
+    if (!authUser) {
         toast({ variant: "destructive", title: "Error", description: "Debes iniciar sesión." });
         return;
     }
     setIsSubmitting(true);
     
-    const tripId = isEditing ? trip.id : doc(collection(firestore, '_')).id;
+    const tripId = isEditing ? trip!.id : doc(collection(firestore, '_')).id;
     const tripRef = doc(firestore, 'vehicles', vehicleId, 'trips', tripId);
     
     const tripData: Partial<Trip> & { id: string, vehicleId: string, userId: string, username: string, startDate: string } = {
         id: tripId,
         vehicleId,
         userId: authUser.uid,
-        username: userProfile.username || authUser.email || 'Usuario',
+        username: userProfile?.username || authUser.email || 'Usuario',
         tripType: values.tripType,
         destination: values.destination,
-        notes: values.notes,
+        notes: values.notes || '',
         startOdometer: values.startOdometer,
         status: values.status,
         stages: values.stages?.map(s => ({
@@ -256,11 +232,10 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         startDate: new Date(values.startDate).toISOString(),
     };
     
-    if (values.exchangeRate && parseCurrency(values.exchangeRate) > 0) {
-        tripData.exchangeRate = parseCurrency(values.exchangeRate);
-    } else {
-        tripData.exchangeRate = null;
-    }
+    // Explicitly set null if exchangeRate is empty to avoid Firestore error
+    tripData.exchangeRate = (values.exchangeRate && parseCurrency(values.exchangeRate) > 0) 
+        ? parseCurrency(values.exchangeRate) 
+        : null;
 
     setDocumentNonBlocking(tripRef, tripData, { merge: true });
 
@@ -287,8 +262,6 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
              <div className="max-h-[65vh] overflow-y-auto pr-4 pl-1 -mr-4 -ml-1">
                 <div className="space-y-4">
-                  <p className="text-sm font-medium">Detalles del Viaje</p>
-                  
                   <div className="grid grid-cols-2 gap-4">
                       <FormField control={control} name="tripType" render={({ field }) => (
                           <FormItem>
@@ -366,38 +339,28 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
                             </Button>
                         </div>
                      )}
-                     {fields.length === 0 && trip?.status === 'active' && <p className="text-xs text-muted-foreground text-center">Añade etapas a tu viaje o finalízalo.</p>}
-
                   </div>
 
-                  {isEditing && (
-                    <>
-                      <Separator />
-                      <FormField
-                          control={form.control}
-                          name="exchangeRate"
-                          render={({ field }) => (
-                          <FormItem>
-                              <FormLabel>Tipo de Cambio (Opcional)</FormLabel>
-                              <div className="flex items-center gap-2">
-                                  <FormControl>
-                                  <Input type="text" placeholder="1 USD = ??? ARS" {...field} value={field.value ?? ''} />
-                                  </FormControl>
-                                  <Button type="button" variant="outline" size="icon" onClick={handleFetchRate} disabled={isFetchingRate}>
-                                      {isFetchingRate ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                                      <span className="sr-only">Obtener cotización actual</span>
-                                  </Button>
-                              </div>
-                              <FormDescription>
-                                  Ingresa el tipo de cambio a dólar del día del gasto para un cálculo preciso del costo real.
-                              </FormDescription>
-                              <FormMessage />
-                          </FormItem>
-                          )}
-                      />
-                    </>
-                  )}
-              </div>
+                  <Separator />
+                  <FormField
+                      control={form.control}
+                      name="exchangeRate"
+                      render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Tipo de Cambio (Opcional)</FormLabel>
+                          <div className="flex items-center gap-2">
+                              <FormControl>
+                                <Input type="text" placeholder="1 USD = ??? ARS" {...field} value={field.value ?? ''} />
+                              </FormControl>
+                              <Button type="button" variant="outline" size="icon" onClick={handleFetchRate} disabled={isFetchingRate}>
+                                  {isFetchingRate ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                              </Button>
+                          </div>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                  />
+                </div>
             </div>
 
             <DialogFooter className="pt-4 border-t">
@@ -429,7 +392,7 @@ function StageExpenses({ stageIndex }: { stageIndex: number }) {
             name={`stages.${stageIndex}.expenses.${expenseIndex}.description`}
             render={({ field }) => (
                 <FormItem className="flex-1">
-                    <FormControl><Input {...field} placeholder="Descripción (ej: Peaje)" /></FormControl>
+                    <FormControl><Input {...field} placeholder="Descripción" /></FormControl>
                     <FormMessage className="text-xs" />
                 </FormItem>
             )}

@@ -24,8 +24,6 @@ export default function MobileBottomNav() {
   const { selectedVehicle } = useVehicles();
   const firestore = useFirestore();
 
-  // --- Lógica de Badges (Idéntica a AppSidebar) ---
-  
   const activeTripsQuery = useMemoFirebase(() => {
     if (!selectedVehicle) return null;
     return query(

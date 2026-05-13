@@ -21,7 +21,6 @@ export default function QuickActions() {
   const { user } = useUser();
   const firestore = useFirestore();
 
-  // Obtenemos el último registro de combustible para pasar el contexto a los diálogos
   const lastFuelLogQuery = useMemoFirebase(() => {
     if (!user || !vehicle) return null;
     return query(
@@ -39,7 +38,7 @@ export default function QuickActions() {
   if (!vehicle || isVehicleLoading) return null;
 
   return (
-    <div className="fixed bottom-20 md:bottom-6 right-6 z-40">
+    <div className="fixed bottom-20 md:bottom-6 right-6 z-[60]">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button 
