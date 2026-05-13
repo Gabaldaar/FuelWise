@@ -2,6 +2,7 @@
 
 import AppHeader from '@/components/layout/app-header';
 import AppSidebar from '@/components/layout/app-sidebar';
+import MobileBottomNav from '@/components/layout/mobile-bottom-nav';
 import { Sidebar, SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { VehicleProvider } from '@/context/vehicle-context';
 import { useUser } from '@/firebase';
@@ -81,10 +82,11 @@ export default function DashboardLayout({
             <SidebarInset>
             <AppHeader />
             <OfflineWarning isOnline={isOnline} />
-            <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-background">
+            <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-background pb-20 md:pb-8">
                 {children}
             </main>
             <QuickActions />
+            <MobileBottomNav />
             </SidebarInset>
         </div>
         </SidebarProvider>
