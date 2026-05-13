@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useUser } from '@/firebase';
 import { Button } from '../ui/button';
 import { BellRing, Loader2 } from 'lucide-react';
@@ -9,34 +10,16 @@ import { urlBase64ToUint8Array } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 
-// This function will be called from other components to trigger the check
-// This function is now obsolete as the cron job handles everything.
-// It is kept here as a reference but it's not used anymore.
-export const triggerRemindersCheck = async (vehicleId: string) => {
-  if (!vehicleId) {
-    console.error("Vehicle ID is required to check reminders.");
-    return;
-  }
-  
-  console.log(`Triggering reminder check for vehicle: ${vehicleId}`);
-  
-  try {
-    // This endpoint no longer exists as logic was moved to a serverless function.
-    // To avoid errors, this function now does nothing.
-    console.log("Reminder check is now handled automatically by the scheduled Netlify function.");
-    return { success: true, message: "Automatic check is in place."};
-
-  } catch (error: any) {
-    console.error("Error triggering reminder check:", error.message);
-  }
-};
-
-
 /**
  * Registers the service worker.
  * @returns {Promise<ServiceWorkerRegistration>}
  */
-async function registerServiceWorker(): Promise<ServiceWorkerRegistration> {
+async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (process.env.NODE_ENV !== "production") {
+    console.log("Registro de Service Worker omitido en desarrollo.");
+    return null;
+  }
+
   if (!('serviceWorker' in navigator)) {
     throw new Error("Service Workers no son soportados.");
   }
@@ -55,6 +38,8 @@ async function registerServiceWorker(): Promise<ServiceWorkerRegistration> {
  * @param {string} idToken - The Firebase auth ID token for the user.
  */
 async function subscribeAndSync(idToken: string): Promise<void> {
+  if (process.env.NODE_ENV !== "production") return;
+
   if (!('PushManager' in window)) {
     throw new Error("Push notifications no son soportadas.");
   }
@@ -115,6 +100,11 @@ function NotificationUI() {
         return;
     }
 
+    if (process.env.NODE_ENV !== "production") {
+        toast({ title: 'Modo Desarrollo', description: 'Las notificaciones push reales solo funcionan en el entorno de producción.' });
+        return;
+    }
+
     setIsSubscribing(true);
     try {
       const permission = await Notification.requestPermission();
@@ -136,7 +126,7 @@ function NotificationUI() {
     }
   };
 
-  if (!isMounted || notificationPermission !== 'default') {
+  if (!isMounted || notificationPermission !== 'default' || process.env.NODE_ENV !== 'production') {
     return null;
   }
 
@@ -166,7 +156,7 @@ export default function NotificationManager() {
 
   useEffect(() => {
     const autoProcess = async () => {
-      if (user && 'serviceWorker' in navigator && 'PushManager' in window) {
+      if (process.env.NODE_ENV === "production" && user && 'serviceWorker' in navigator && 'PushManager' in window) {
         await registerServiceWorker();
         if (Notification.permission === 'granted') {
           console.log("Permiso concedido. Intentando suscribir y sincronizar...");

@@ -5,8 +5,8 @@ import { useEffect } from "react";
 
 const PwaSetup = () => {
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      // Register the service worker immediately, don't wait for 'load'
+    // Solo registrar el Service Worker en producción para evitar errores de redirección en desarrollo
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js")
         .then((registration) => console.log("Service Worker registrado con éxito:", registration))
