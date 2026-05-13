@@ -39,7 +39,7 @@ export default function QuickActions() {
   if (!vehicle || isVehicleLoading) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-40">
+    <div className="fixed bottom-20 md:bottom-6 right-6 z-40">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button 
