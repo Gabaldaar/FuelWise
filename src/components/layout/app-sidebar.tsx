@@ -87,7 +87,6 @@ export default function AppSidebar() {
   const { selectedVehicle } = useVehicles();
   const firestore = useFirestore();
 
-  // Fetch active trips
   const activeTripsQuery = useMemoFirebase(() => {
     if (!selectedVehicle) return null;
     return query(
@@ -97,7 +96,6 @@ export default function AppSidebar() {
   }, [firestore, selectedVehicle]);
   const { data: activeTrips } = useCollection<Trip>(activeTripsQuery);
 
-  // Fetch pending service reminders
   const pendingRemindersQuery = useMemoFirebase(() => {
     if (!selectedVehicle) return null;
     return query(
@@ -107,7 +105,6 @@ export default function AppSidebar() {
   }, [firestore, selectedVehicle]);
   const { data: pendingReminders } = useCollection<ServiceReminder>(pendingRemindersQuery);
 
-  // Fetch last odometer reading
   const lastFuelLogQuery = useMemoFirebase(() => {
     if (!selectedVehicle) return null;
     return query(
@@ -119,15 +116,13 @@ export default function AppSidebar() {
   const { data: lastFuelLog } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
   const lastOdometer = lastFuelLog?.[0]?.odometer || 0;
 
-  // Calculate overdue services count
   const overdueServicesCount = useMemo(() => {
     if (!pendingReminders || !lastOdometer) return 0;
     
     return pendingReminders.filter(r => {
       const kmsRemaining = r.dueOdometer ? r.dueOdometer - lastOdometer : null;
       const daysRemaining = r.dueDate ? differenceInDays(new Date(r.dueDate), new Date()) : null;
-      const isOverdue = (kmsRemaining !== null && kmsRemaining < 0) || (daysRemaining !== null && daysRemaining < 0);
-      return isOverdue;
+      return (kmsRemaining !== null && kmsRemaining < 0) || (daysRemaining !== null && daysRemaining < 0);
     }).length;
   }, [pendingReminders, lastOdometer]);
 
@@ -149,18 +144,14 @@ export default function AppSidebar() {
         <SidebarMenu>
           {menuItems.map((item) => {
             let badgeCount = 0;
-            if (item.href === '/dashboard/services' && overdueServicesCount > 0) {
-              badgeCount = overdueServicesCount;
-            }
-            if (item.href === '/dashboard/trips' && activeTripsCount > 0) {
-              badgeCount = activeTripsCount;
-            }
+            if (item.href === '/dashboard/services') badgeCount = overdueServicesCount;
+            if (item.href === '/dashboard/trips') badgeCount = activeTripsCount;
 
             return (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} onClick={handleLinkClick}>
                   <SidebarMenuButton
-                    isActive={pathname.startsWith(item.href) && (item.href === '/dashboard' ? pathname === item.href : true)}
+                    isActive={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))}
                     tooltip={item.label}
                   >
                     <item.icon />
