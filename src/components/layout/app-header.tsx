@@ -12,12 +12,12 @@ export default function AppHeader() {
   
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 lg:px-8">
-      <SidebarTrigger />
+      <SidebarTrigger className="h-9 w-9" />
       
       <div className="flex flex-1 items-center gap-4">
         {selectedVehicle && (
            <div className="flex items-center gap-3">
-              <div className="relative h-10 w-10 flex-shrink-0">
+              <div className="relative h-9 w-9 flex-shrink-0">
                 {selectedVehicle.imageUrl ? (
                     <Image
                       src={selectedVehicle.imageUrl}
@@ -28,13 +28,15 @@ export default function AppHeader() {
                     />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center rounded-full bg-muted">
-                    <Car className="h-6 w-6 text-muted-foreground" />
+                    <Car className="h-5 w-5 text-muted-foreground" />
                   </div>
                 )}
               </div>
               <div className="hidden xs:block">
-                <h2 className="font-semibold text-sm sm:text-lg leading-tight">{selectedVehicle.make} {selectedVehicle.model}</h2>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">{selectedVehicle.plate}</p>
+                <h2 className="font-semibold text-xs sm:text-sm leading-tight truncate max-w-[120px] sm:max-w-none">
+                  {selectedVehicle.make} {selectedVehicle.model}
+                </h2>
+                <p className="text-[10px] text-muted-foreground">{selectedVehicle.plate}</p>
               </div>
            </div>
         )}

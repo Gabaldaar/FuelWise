@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, Fuel, Wrench, Route, Loader2 } from 'lucide-react';
+import { Plus, Fuel, Wrench, Route } from 'lucide-react';
 import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
@@ -30,7 +30,7 @@ export default function QuickActions() {
     );
   }, [firestore, user, vehicle]);
 
-  const { data: lastFuelLogData, isLoading: isLoadingLogs } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
+  const { data: lastFuelLogData } = useCollection<ProcessedFuelLog>(lastFuelLogQuery);
   
   const lastLog = lastFuelLogData?.[0];
   const lastOdometer = lastLog?.odometer || 0;
@@ -43,7 +43,7 @@ export default function QuickActions() {
         <DropdownMenuTrigger asChild>
           <Button 
             size="icon" 
-            className="h-14 w-14 rounded-full shadow-2xl hover:scale-110 transition-transform bg-primary text-primary-foreground"
+            className="h-14 w-14 rounded-full shadow-2xl hover:scale-110 transition-transform bg-primary text-primary-foreground border-4 border-background"
             aria-label="Acciones rápidas"
           >
             <Plus className="h-7 w-7" />

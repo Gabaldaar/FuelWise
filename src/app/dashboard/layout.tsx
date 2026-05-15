@@ -76,8 +76,8 @@ export default function DashboardLayout({
         <SidebarProvider>
         <ClientOnlyNotificationManager />
         <div className="relative flex h-screen w-full flex-col overflow-hidden">
-            <Sidebar>
-            <AppSidebar />
+            <Sidebar collapsible="offcanvas">
+              <AppSidebar />
             </Sidebar>
             <SidebarInset>
             <AppHeader />
