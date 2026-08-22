@@ -60,18 +60,20 @@ function UserInfo() {
 
   const getInitials = (name?: string) => {
     if (!name) return '?';
-    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    return name.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() || '?';
   }
 
   if (!authUser) return null;
 
+  const displayName = userProfile?.username || authUser.displayName || authUser.email?.split('@')[0] || 'Usuario';
+
   return (
     <div className='flex items-center gap-2 px-1'>
       <Avatar className='h-8 w-8 shrink-0'>
-        <AvatarFallback>{getInitials(userProfile?.username)}</AvatarFallback>
+        <AvatarFallback>{getInitials(displayName)}</AvatarFallback>
       </Avatar>
       <div className='flex flex-col text-sm truncate flex-1'>
-        <span className='font-semibold text-sidebar-foreground truncate'>{userProfile?.username}</span>
+        <span className='font-semibold text-sidebar-foreground truncate'>{displayName}</span>
         <span className='text-[10px] text-muted-foreground truncate'>{authUser.email}</span>
       </div>
       <Button variant="ghost" size="icon" onClick={handleSignOut} title="Cerrar sesión" className='h-8 w-8 shrink-0'>

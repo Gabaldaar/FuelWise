@@ -218,7 +218,7 @@ export default function AddTripDialog({ vehicleId, trip, children, lastOdometer 
         id: tripId,
         vehicleId,
         userId: authUser.uid,
-        username: userProfile?.username || authUser.email || 'Usuario',
+        username: userProfile?.username || authUser.displayName || authUser.email?.split('@')[0] || authUser.email || 'Usuario',
         tripType: values.tripType,
         destination: values.destination,
         notes: values.notes || '',

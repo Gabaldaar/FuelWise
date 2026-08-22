@@ -206,7 +206,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
 
 
   async function onSubmit(values: FormValues) {
-    if (!authUser || !userProfile) {
+    if (!authUser) {
         toast({
             variant: "destructive",
             title: "Error",
@@ -255,7 +255,7 @@ export default function AddFuelLogDialog({ vehicleId, lastLog, fuelLog, vehicle,
         date: values.date.toISOString(),
         vehicleId,
         userId: authUser.uid,
-        username: userProfile.username || authUser.email || 'Usuario',
+        username: userProfile?.username || authUser.displayName || authUser.email?.split('@')[0] || authUser.email || 'Usuario',
         gasStation: values.gasStation || '',
         totalCost: totalCostNum,
         liters: parseCurrency(values.liters),
