@@ -15,7 +15,7 @@ export function FirebaseErrorListener() {
   useEffect(() => {
     // The callback now expects a strongly-typed error, matching the event payload.
     const handleError = (error: FirestorePermissionError) => {
-      // Set error in state to trigger a re-render.
+      console.warn('Firestore Permission Warning:', error.message);
       setError(error);
     };
 
@@ -29,11 +29,6 @@ export function FirebaseErrorListener() {
     };
   }, []);
 
-  // On re-render, if an error exists in state, throw it.
-  if (error) {
-    throw error;
-  }
-
-  // This component renders nothing.
+  // This component renders nothing and does not crash the app.
   return null;
 }

@@ -154,9 +154,9 @@ export default function DashboardPage() {
   }, [sortedPendingReminders]);
 
 
-  if (isVehicleLoading || !vehicle) {
+  if (isVehicleLoading) {
     return (
-        <div className="flex justify-center items-center h-full">
+        <div className="flex justify-center items-center h-full py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
     );
@@ -178,7 +178,7 @@ export default function DashboardPage() {
           </AddVehicleDialog>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (

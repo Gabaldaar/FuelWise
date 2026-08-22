@@ -193,11 +193,22 @@ export default function HistoryPage() {
   
   const isLoading = isLoadingLogs || isLoadingReminders || isLoadingTrips;
 
-  if (isLoading || !vehicle || !vehicleWithAvgConsumption) {
+  if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
+      <div className="flex h-64 w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
+    );
+  }
+
+  if (!vehicle || !vehicleWithAvgConsumption) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Historial del Vehículo</CardTitle>
+          <CardDescription>Por favor, añade o selecciona un vehículo para ver su historial.</CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
   

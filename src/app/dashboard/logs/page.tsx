@@ -116,11 +116,22 @@ export default function LogsPage() {
 
   const lastLog = processedLogs?.[0]; // Already sorted desc
 
-  if (isLoading || !vehicle || !vehicleWithAvgConsumption) {
+  if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
+      <div className="flex h-64 w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
+    );
+  }
+
+  if (!vehicle || !vehicleWithAvgConsumption) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Registros de Combustible</CardTitle>
+          <CardDescription>Por favor, añade o selecciona un vehículo para ver sus registros.</CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
