@@ -40,6 +40,7 @@ export default function VehiclesPage() {
                                 fill
                                 className="object-cover rounded-t-lg"
                                 data-ai-hint={vehicle.imageHint}
+                                unoptimized
                             />
                             </div>
                         )}

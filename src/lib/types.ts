@@ -17,11 +17,22 @@ export type Vehicle = {
   usefulLifeYears?: number;
   resaleValue?: number;
   // New detailed cost fields
-  kmPerYear?: number; // KA
-  maintenanceCost?: number; // SM
-  maintenanceKm?: number; // KSM
   tiresCost?: number; // N
   tiresKm?: number; // KN
+  // Multi-user ownership & fleet sharing
+  ownerId?: string;
+  ownerEmail?: string;
+  sharedWith?: string[]; // list of collaborator emails
+};
+
+export type FleetCollaborator = {
+  id: string;
+  email: string;
+  name?: string;
+  invitedBy: string;
+  invitedById: string;
+  role: 'admin' | 'viewer';
+  addedAt: string;
 };
 
 export type FuelLog = {

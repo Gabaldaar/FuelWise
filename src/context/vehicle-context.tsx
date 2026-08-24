@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import type { Vehicle } from '@/lib/types';
+import type { Vehicle, FleetCollaborator } from '@/lib/types';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 
@@ -30,7 +30,57 @@ export const VehicleProvider = ({ children }: { children: ReactNode }) => {
     return query(collection(firestore, 'vehicles'), orderBy('make'));
   }, [firestore, user]);
 
-  const { data: vehicles, isLoading } = useCollection<Vehicle>(vehiclesQuery);
+  const collaboratorsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(firestore, 'fleet_collaborators'));
+  }, [firestore, user]);
+
+  const { data: allVehicles, isLoading: isLoadingVehicles } = useCollection<Vehicle>(vehiclesQuery);
+  const { data: collaborators, isLoading: isLoadingCollaborators } = useCollection<FleetCollaborator>(collaboratorsQuery);
+
+  // Filter vehicles accessible to the current user
+  const vehicles = useMemo(() => {
+    if (!allVehicles || !user) return [];
+
+    const userEmail = user.email?.toLowerCase().trim() || '';
+    const userId = user.uid;
+
+    // Check if the current user is an invited collaborator
+    const myInvitations = collaborators?.filter(
+      c => c.email?.toLowerCase().trim() === userEmail
+    ) || [];
+    const invitedOwnerIds = new Set(myInvitations.map(c => c.invitedById));
+    const invitedOwnerEmails = new Set(myInvitations.map(c => c.invitedBy?.toLowerCase().trim()));
+
+    return allVehicles.filter(v => {
+      // 1. Current user is the owner
+      if (v.ownerId && v.ownerId === userId) return true;
+      if (v.ownerEmail && v.ownerEmail.toLowerCase().trim() === userEmail) return true;
+
+      // 2. Legacy vehicle with no owner specified belongs to primary fleet
+      if (!v.ownerId && !v.ownerEmail) {
+        // Visible to primary owner or invited users
+        if (userEmail.includes('gab.aldazabal') || myInvitations.length > 0 || !allVehicles.some(other => other.ownerId === userId)) {
+          return true;
+        }
+      }
+
+      // 3. User's email is explicitly listed in vehicle.sharedWith
+      if (v.sharedWith && Array.isArray(v.sharedWith)) {
+        if (v.sharedWith.some(email => email.toLowerCase().trim() === userEmail)) {
+          return true;
+        }
+      }
+
+      // 4. User is an authorized fleet collaborator of this vehicle's owner
+      if (v.ownerId && invitedOwnerIds.has(v.ownerId)) return true;
+      if (v.ownerEmail && invitedOwnerEmails.has(v.ownerEmail.toLowerCase().trim())) return true;
+
+      return false;
+    });
+  }, [allVehicles, collaborators, user]);
+
+  const isLoading = isLoadingVehicles || isLoadingCollaborators;
 
   useEffect(() => {
     if (isLoading || !vehicles) return;
@@ -49,19 +99,18 @@ export const VehicleProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // 2. Priority: Last selected vehicle from localStorage
-    const lastSelectedVehicleId = localStorage.getItem('lastSelectedVehicleId');
+    const lastSelectedVehicleId = typeof window !== 'undefined' ? localStorage.getItem('lastSelectedVehicleId') : null;
     if (lastSelectedVehicleId) {
-        const lastSelected = vehicles.find(v => v.id === lastSelectedVehicleId);
-        if (lastSelected) {
-            if (selectedVehicle?.id !== lastSelected.id) {
-              setSelectedVehicle(lastSelected);
-              // Update URL silently
-              const params = new URLSearchParams(searchParams.toString());
-              params.set('vehicle', lastSelected.id);
-              router.replace(`${pathname}?${params.toString()}`);
-            }
-            return;
+      const lastSelected = vehicles.find(v => v.id === lastSelectedVehicleId);
+      if (lastSelected) {
+        if (selectedVehicle?.id !== lastSelected.id) {
+          setSelectedVehicle(lastSelected);
+          const params = new URLSearchParams(searchParams.toString());
+          params.set('vehicle', lastSelected.id);
+          router.replace(`${pathname}?${params.toString()}`);
         }
+        return;
+      }
     }
     
     // 3. Fallback: First vehicle in the list
@@ -69,7 +118,6 @@ export const VehicleProvider = ({ children }: { children: ReactNode }) => {
       const vehicleToSelect = vehicles[0];
       if (selectedVehicle?.id !== vehicleToSelect.id) {
         setSelectedVehicle(vehicleToSelect);
-        // Update URL silently
         const params = new URLSearchParams(searchParams.toString());
         params.set('vehicle', vehicleToSelect.id);
         router.replace(`${pathname}?${params.toString()}`);
@@ -80,8 +128,8 @@ export const VehicleProvider = ({ children }: { children: ReactNode }) => {
         setSelectedVehicle(null);
         const params = new URLSearchParams(searchParams.toString());
         if (params.has('vehicle')) {
-            params.delete('vehicle');
-            router.replace(`${pathname}?${params.toString()}`);
+          params.delete('vehicle');
+          router.replace(`${pathname}?${params.toString()}`);
         }
       }
     }
@@ -91,7 +139,9 @@ export const VehicleProvider = ({ children }: { children: ReactNode }) => {
     const vehicle = vehicles?.find(v => v.id === vehicleId);
     if (vehicle) {
       setSelectedVehicle(vehicle);
-      localStorage.setItem('lastSelectedVehicleId', vehicleId); // Save to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('lastSelectedVehicleId', vehicleId);
+      }
       const params = new URLSearchParams(searchParams.toString());
       params.set('vehicle', vehicleId);
       router.push(`${pathname}?${params.toString()}`);

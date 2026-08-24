@@ -14,10 +14,11 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import SettingsList from '@/components/settings/settings-list';
+import FleetUsersSettings from '@/components/settings/fleet-users-settings';
 import type { ConfigItem } from '@/lib/types';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import { Droplets, Wrench, Building, SlidersHorizontal, Route } from 'lucide-react';
+import { Droplets, Wrench, Building, SlidersHorizontal, Route, Users } from 'lucide-react';
 import PreferencesSettings from '@/components/settings/preferences-settings';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -25,7 +26,7 @@ export default function SettingsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
 
-  // Queries now point to top-level collections
+  // Queries point to top-level collections
   const fuelTypesQuery = useMemoFirebase(() => {
     if (!user) return null;
     return query(collection(firestore, 'fuel_types'), orderBy('name'));
@@ -51,20 +52,20 @@ export default function SettingsPage() {
   const { data: gasStations, isLoading: isLoadingStations } = useCollection<ConfigItem>(gasStationsQuery);
   const { data: tripTypes, isLoading: isLoadingTripTypes } = useCollection<ConfigItem>(tripTypesQuery);
 
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="font-headline">Configuración</CardTitle>
         <CardDescription>
-          Personaliza las opciones de la aplicación para agilizar el ingreso de datos.
+          Personaliza las opciones de la aplicación y gestiona los usuarios con acceso a la flota.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="preferences">
           <ScrollArea className="w-full whitespace-nowrap sm:whitespace-normal">
-            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-5">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6">
               <TabsTrigger value="preferences"><SlidersHorizontal className="mr-2 h-4 w-4" />Preferencias</TabsTrigger>
+              <TabsTrigger value="users"><Users className="mr-2 h-4 w-4" />Usuarios</TabsTrigger>
               <TabsTrigger value="fuel"><Droplets className="mr-2 h-4 w-4" />Combustibles</TabsTrigger>
               <TabsTrigger value="services"><Wrench className="mr-2 h-4 w-4" />Servicios</TabsTrigger>
               <TabsTrigger value="stations"><Building className="mr-2 h-4 w-4" />Gasolineras</TabsTrigger>
@@ -73,6 +74,9 @@ export default function SettingsPage() {
           </ScrollArea>
           <TabsContent value="preferences">
             <PreferencesSettings />
+          </TabsContent>
+          <TabsContent value="users">
+            <FleetUsersSettings />
           </TabsContent>
           <TabsContent value="fuel">
             <SettingsList

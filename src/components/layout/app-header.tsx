@@ -25,6 +25,7 @@ export default function AppHeader() {
                       fill
                       className="rounded-full object-cover"
                       data-ai-hint={selectedVehicle.imageHint}
+                      unoptimized
                     />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center rounded-full bg-muted">
