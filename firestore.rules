@@ -1,40 +1,11 @@
 /**
  * @fileoverview Firestore Security Rules for MotorLog application.
- *
- * Core Philosophy:
- * This ruleset allows any authenticated user to read and write most data,
- * supporting multi-user collaboration on vehicles.
- * 
- * Server-Side Cron Job:
- * A special rule is in place to allow our server-side cron job (which runs with
- * admin privileges and thus has a null `request.auth`) to read data. This is
- * necessary for the job to check all reminders across all vehicles.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    // Allow server-side admin processes (like our cron job) to read any data.
-    // The cron job is authenticated via service account, so request.auth is null.
-    // We restrict this to "get" and "list" for safety.
-    function isServerProcess() {
-      return request.auth == null;
-    }
-
-    // User profiles are private. Only the owner can read/write.
-    match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
-    }
-    
-    // All other collections are open to any authenticated user for R/W,
-    // or to the server process for reads.
-    match /{path=**} {
-       allow read: if isSignedIn() || isServerProcess();
-       allow write: if isSignedIn();
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }

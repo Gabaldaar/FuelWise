@@ -57,7 +57,7 @@ export default function LoginPage() {
         title: '¡Bienvenido!',
         description: 'Has iniciado sesión correctamente.',
       });
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
     } catch (error: any) {
       let description = 'Ocurrió un error inesperado.';
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {

@@ -73,7 +73,7 @@ export default function SignupPage() {
         title: '¡Cuenta creada!',
         description: 'Te hemos registrado correctamente.',
       });
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
     } catch (error: any) {
        let description = 'Ocurrió un error inesperado.';
       if (error.code === 'auth/email-already-in-use') {
