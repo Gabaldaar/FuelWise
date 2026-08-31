@@ -6,13 +6,13 @@ import webpush from 'web-push';
 import { differenceInHours } from 'date-fns';
 
 function initVapid() {
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const publicKey =
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+    'BCSVEMyiP_wAzlwp4_HT68djG5Ukbj2eXcUHyP4TX28W09Sw_y7GdMqDjzaRq7UJBPwlo6nIVFiSg06CF0P9vxo';
+  const privateKey =
+    process.env.VAPID_PRIVATE_KEY ||
+    'pkKY_u2M-HHqvV19ppdrGNYnG4VIpDjERBa0boPcjKk';
   const subject = process.env.VAPID_SUBJECT || 'mailto:gab.aldazabal@gmail.com';
-
-  if (!publicKey || !privateKey) {
-    throw new Error('VAPID keys are missing in environment variables.');
-  }
 
   webpush.setVapidDetails(subject, publicKey, privateKey);
 }

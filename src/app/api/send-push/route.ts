@@ -6,13 +6,13 @@ import type { PushSubscription } from 'web-push';
 import admin from '@/firebase/admin';
 
 function initVapid() {
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const publicKey =
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+    'BCSVEMyiP_wAzlwp4_HT68djG5Ukbj2eXcUHyP4TX28W09Sw_y7GdMqDjzaRq7UJBPwlo6nIVFiSg06CF0P9vxo';
+  const privateKey =
+    process.env.VAPID_PRIVATE_KEY ||
+    'pkKY_u2M-HHqvV19ppdrGNYnG4VIpDjERBa0boPcjKk';
   const subject = process.env.VAPID_SUBJECT || 'mailto:gab.aldazabal@gmail.com';
-
-  if (!publicKey || !privateKey) {
-    throw new Error('VAPID keys are missing in environment variables.');
-  }
 
   webpush.setVapidDetails(subject, publicKey, privateKey);
 }
@@ -64,10 +64,13 @@ export async function POST(request: Request) {
         .get();
 
       if (subscriptionsSnapshot.empty) {
-        return NextResponse.json({
-          success: false,
-          message: 'No active subscriptions found for this user.',
-        }, { status: 404 });
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'No hay dispositivos suscritos para este usuario.',
+          },
+          { status: 404 }
+        );
       }
 
       let sentCount = 0;
@@ -80,7 +83,6 @@ export async function POST(request: Request) {
           await webpush.sendNotification(sub, notificationPayload);
           sentCount++;
         } catch (err: any) {
-          // If subscription is expired or unsubscribed, remove from Firestore
           if (err.statusCode === 410 || err.statusCode === 404) {
             console.log(`Removing expired subscription: ${docSnap.id}`);
             await docSnap.ref.delete().catch(() => {});
@@ -95,7 +97,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         sentCount,
-        message: `Notification dispatched to ${sentCount} device(s).`,
+        message: `Notificación enviada a ${sentCount} dispositivo(s).`,
       });
     }
 

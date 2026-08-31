@@ -16,8 +16,12 @@ const serviceAccountConfig = {
 
 if (!admin.apps.length) {
   try {
+    const formattedPrivateKey = serviceAccountConfig.private_key.replace(/\\n/g, '\n');
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccountConfig as admin.ServiceAccount),
+      credential: admin.credential.cert({
+        ...serviceAccountConfig,
+        privateKey: formattedPrivateKey,
+      } as admin.ServiceAccount),
       projectId: serviceAccountConfig.project_id,
     });
     console.log('[Firebase Admin] Initialized with Service Account cert for:', serviceAccountConfig.project_id);
