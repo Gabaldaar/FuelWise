@@ -9,6 +9,7 @@ const pwaConfig = {
   disable: process.env.NODE_ENV === 'development',
   sw: 'sw.js',
   customWorkerDir: 'worker',
+  buildExcludes: [/app-build-manifest\.json$/, /middleware-manifest\.json$/],
 };
 
 const nextConfig: NextConfig = {
