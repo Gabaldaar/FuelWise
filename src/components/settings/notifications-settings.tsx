@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useUser, useFirestore } from '@/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { urlBase64ToUint8Array } from '@/lib/utils';
 import {
   Bell,
-  BellRing,
   CheckCircle2,
   AlertTriangle,
   XCircle,
@@ -42,63 +43,60 @@ export default function NotificationsSettings() {
 
     setPermission(Notification.permission);
 
-    // Check if subscription already exists in service worker
+    // Check if active subscription exists in service worker
     navigator.serviceWorker.ready
       .then((reg) => reg.pushManager.getSubscription())
       .then((sub) => {
         setIsSubscribed(!!sub);
       })
-      .catch((err) => console.log('Error checking subscription:', err));
+      .catch((err) => console.log('Error verificando suscripción previa:', err));
   }, []);
 
-  const handleSubscribe = async () => {
+  const handleToggleNotifications = async (enable: boolean) => {
     if (!user) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Debes iniciar sesión para activar las notificaciones.',
+        description: 'Debes iniciar sesión para configurar las notificaciones.',
       });
       return;
     }
 
     setIsActivating(true);
     try {
-      // 1. Request permission
-      const result = await Notification.requestPermission();
-      setPermission(result);
+      if (enable) {
+        // --- ACTIVAR NOTIFICACIONES ---
+        const result = await Notification.requestPermission();
+        setPermission(result);
 
-      if (result !== 'granted') {
-        toast({
-          variant: 'destructive',
-          title: 'Permiso Denegado',
-          description: 'Debes permitir las notificaciones en la configuración de tu navegador.',
-        });
-        setIsActivating(false);
-        return;
-      }
+        if (result !== 'granted') {
+          toast({
+            variant: 'destructive',
+            title: 'Permiso Denegado',
+            description: 'Debes autorizar las notificaciones en los ajustes de tu navegador.',
+          });
+          setIsActivating(false);
+          return;
+        }
 
-      // 2. Register service worker
-      const reg = await navigator.serviceWorker.register('/sw.js');
-      await navigator.serviceWorker.ready;
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        await navigator.serviceWorker.ready;
 
-      // 3. Subscribe with VAPID Key
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!vapidKey) {
-        throw new Error('No se encontró la clave pública VAPID.');
-      }
+        const vapidKey =
+          process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+          'BCSVEMyiP_wAzlwp4_HT68djG5Ukbj2eXcUHyP4TX28W09Sw_y7GdMqDjzaRq7UJBPwlo6nIVFiSg06CF0P9vxo';
 
-      let sub = await reg.pushManager.getSubscription();
-      if (!sub) {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey),
-        });
-      }
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(vapidKey),
+          });
+        }
 
-      const subscriptionJSON = JSON.parse(JSON.stringify(sub));
+        const subscriptionJSON = JSON.parse(JSON.stringify(sub));
 
-      // 4. Save directly to Firestore for 100% reliable real-time sync
-      try {
+        // 1. Guardar en Firestore
         const docId = encodeURIComponent(sub.endpoint);
         await setDoc(
           doc(firestore, 'subscriptions', docId),
@@ -106,44 +104,61 @@ export default function NotificationsSettings() {
             userId: user.uid,
             userEmail: user.email || null,
             subscription: subscriptionJSON,
+            enabled: true,
             updatedAt: serverTimestamp(),
           },
           { merge: true }
         );
-      } catch (dbErr: any) {
-        console.warn('Firestore direct write notice:', dbErr.message);
-      }
 
-      // 5. Also sync with backend API
-      try {
-        const idToken = await user.getIdToken(true);
-        await fetch('/api/subscribe', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({
-            subscription: subscriptionJSON,
-            userId: user.uid,
-            userEmail: user.email,
-          }),
+        // 2. Sincronizar en API
+        try {
+          const idToken = await user.getIdToken(true);
+          await fetch('/api/subscribe', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              subscription: subscriptionJSON,
+              userId: user.uid,
+              userEmail: user.email,
+            }),
+          });
+        } catch (e) {
+          // Sync secundario
+        }
+
+        setIsSubscribed(true);
+        toast({
+          title: '🔔 Notificaciones Activadas',
+          description: 'Este dispositivo recibirá alertas de servicios de mantenimiento.',
         });
-      } catch (apiErr) {
-        console.warn('API sync notice:', apiErr);
-      }
+      } else {
+        // --- DESACTIVAR NOTIFICACIONES ---
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
 
-      setIsSubscribed(true);
-      toast({
-        title: '¡Notificaciones Activadas!',
-        description: 'Este dispositivo recibirá alertas de recordatorios de mantenimiento.',
-      });
+        if (sub) {
+          // Eliminar de Firestore
+          const docId = encodeURIComponent(sub.endpoint);
+          await deleteDoc(doc(firestore, 'subscriptions', docId)).catch(() => {});
+          // Cancelar suscripción del navegador
+          await sub.unsubscribe().catch(() => {});
+        }
+
+        setIsSubscribed(false);
+        toast({
+          title: '🔕 Notificaciones Desactivadas',
+          description: 'Este dispositivo ya no recibirá avisos automáticos.',
+        });
+      }
     } catch (error: any) {
-      console.error('Error al suscribir:', error);
+      console.error('Error al cambiar estado de notificaciones:', error);
       toast({
         variant: 'destructive',
-        title: 'Error de Activación',
-        description: error.message || 'No se pudo completar la suscripción.',
+        title: 'Error de Configuración',
+        description: error.message || 'No se pudo actualizar el estado de las notificaciones.',
       });
     } finally {
       setIsActivating(false);
@@ -165,8 +180,8 @@ export default function NotificationsSettings() {
           subscription: sub ? JSON.parse(JSON.stringify(sub)) : undefined,
           userId: user.uid,
           payload: {
-            title: '🚗 MotorLog - Prueba Exitosa',
-            body: '¡Las notificaciones push están funcionando perfectamente en este dispositivo!',
+            title: '🚗 MotorLog - Notificación de Prueba',
+            body: '¡El sistema de alertas push está funcionando correctamente en este equipo!',
             url: '/dashboard',
           },
         }),
@@ -246,51 +261,66 @@ export default function NotificationsSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Estado Actual */}
+      {/* Control Principal con Interruptor On/Off */}
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Smartphone className="h-5 w-5 text-primary" />
-                Estado en este Dispositivo
+                Control de Notificaciones en este Dispositivo
               </CardTitle>
               <CardDescription>
-                Configuración del servicio de alertas en tiempo real para tu navegador o PWA.
+                Activa o desactiva las alertas automáticas de mantenimiento en este navegador o teléfono.
               </CardDescription>
             </div>
             <div>
-              {permission === 'granted' ? (
+              {permission === 'granted' && isSubscribed ? (
                 <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 py-1 px-3">
-                  <CheckCircle2 className="h-4 w-4" /> Notificaciones Permitidas
+                  <CheckCircle2 className="h-4 w-4" /> Alertas Activas
                 </Badge>
               ) : permission === 'denied' ? (
                 <Badge variant="destructive" className="flex items-center gap-1.5 py-1 px-3">
-                  <XCircle className="h-4 w-4" /> Bloqueadas por el Navegador
+                  <XCircle className="h-4 w-4" /> Bloqueadas en Navegador
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="flex items-center gap-1.5 py-1 px-3">
-                  <AlertTriangle className="h-4 w-4" /> Permiso Pendiente
+                  <AlertTriangle className="h-4 w-4" /> Desactivadas
                 </Badge>
               )}
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Al activar las notificaciones, MotorLog te avisará cuando un service o mantenimiento de tus vehículos esté próximo a vencer o vencido por fecha o kilometraje.
-          </p>
+        <CardContent className="space-y-6">
+          {/* Interruptor ON/OFF */}
+          <div className="flex items-center justify-between p-4 border rounded-lg bg-card/60">
+            <div className="space-y-1 pr-4">
+              <Label htmlFor="notifications-switch" className="text-base font-semibold flex items-center gap-2 cursor-pointer">
+                <Bell className="h-4 w-4 text-primary" />
+                Notificaciones de Recordatorios
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {isSubscribed
+                  ? 'Activado: Recibirás avisos cuando venza un service por fecha o kilometraje.'
+                  : 'Desactivado: Este equipo no recibirá notificaciones ni alertas sonoras.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {isActivating && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+              <Switch
+                id="notifications-switch"
+                checked={isSubscribed}
+                onCheckedChange={handleToggleNotifications}
+                disabled={isActivating}
+              />
+            </div>
+          </div>
 
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Button onClick={handleSubscribe} disabled={isActivating} className="flex items-center gap-2">
-              {isActivating ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
-              {permission === 'granted' ? 'Re-sincronizar Dispositivo' : 'Activar Notificaciones'}
-            </Button>
-
+          <div className="flex flex-wrap gap-3">
             <Button
               variant="outline"
               onClick={handleSendTestPush}
-              disabled={isTesting || permission !== 'granted'}
+              disabled={isTesting || !isSubscribed}
               className="flex items-center gap-2"
             >
               {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -305,10 +335,10 @@ export default function NotificationsSettings() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <RefreshCw className="h-5 w-5 text-primary" />
-            Verificación y Envío de Recordatorios
+            Verificación de Mantenimientos del Garaje
           </CardTitle>
           <CardDescription>
-            El sistema evalúa periódicamente todos los vehículos y envía avisos automáticos a los usuarios cuando se aproxima la fecha o kilometraje programado.
+            El sistema evalúa periódicamente todos los vehículos de tu flota y envía avisos a los dispositivos que tengan las notificaciones activadas.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
