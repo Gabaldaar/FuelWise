@@ -15,10 +15,11 @@ import {
 } from '@/components/ui/tabs';
 import SettingsList from '@/components/settings/settings-list';
 import FleetUsersSettings from '@/components/settings/fleet-users-settings';
+import NotificationsSettings from '@/components/settings/notifications-settings';
 import type { ConfigItem } from '@/lib/types';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import { Droplets, Wrench, Building, SlidersHorizontal, Route, Users } from 'lucide-react';
+import { Droplets, Wrench, Building, SlidersHorizontal, Route, Users, Bell } from 'lucide-react';
 import PreferencesSettings from '@/components/settings/preferences-settings';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -57,14 +58,15 @@ export default function SettingsPage() {
       <CardHeader>
         <CardTitle className="font-headline">Configuración</CardTitle>
         <CardDescription>
-          Personaliza las opciones de la aplicación y gestiona los usuarios con acceso a la flota.
+          Personaliza las opciones de la aplicación, alertas de notificaciones y gestión de flota.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="preferences">
           <ScrollArea className="w-full whitespace-nowrap sm:whitespace-normal">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-7">
               <TabsTrigger value="preferences"><SlidersHorizontal className="mr-2 h-4 w-4" />Preferencias</TabsTrigger>
+              <TabsTrigger value="notifications"><Bell className="mr-2 h-4 w-4" />Notificaciones</TabsTrigger>
               <TabsTrigger value="users"><Users className="mr-2 h-4 w-4" />Usuarios</TabsTrigger>
               <TabsTrigger value="fuel"><Droplets className="mr-2 h-4 w-4" />Combustibles</TabsTrigger>
               <TabsTrigger value="services"><Wrench className="mr-2 h-4 w-4" />Servicios</TabsTrigger>
@@ -74,6 +76,9 @@ export default function SettingsPage() {
           </ScrollArea>
           <TabsContent value="preferences">
             <PreferencesSettings />
+          </TabsContent>
+          <TabsContent value="notifications">
+            <NotificationsSettings />
           </TabsContent>
           <TabsContent value="users">
             <FleetUsersSettings />
