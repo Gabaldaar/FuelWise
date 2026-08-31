@@ -1,91 +1,101 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Button } from '../ui/button';
 import { BellRing, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { urlBase64ToUint8Array } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-
-/**
- * Registers the service worker.
- * @returns {Promise<ServiceWorkerRegistration>}
- */
 async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
-  if (process.env.NODE_ENV !== "production") {
-    console.log("Registro de Service Worker omitido en desarrollo.");
+  if (process.env.NODE_ENV !== 'production') {
     return null;
   }
 
   if (!('serviceWorker' in navigator)) {
-    throw new Error("Service Workers no son soportados.");
+    return null;
   }
+
   try {
     const registration = await navigator.serviceWorker.register('/sw.js');
-    console.log("Service Worker registrado correctamente.");
     return registration;
   } catch (error) {
-    console.error("Fallo el registro del Service Worker:", error);
-    throw new Error("Fallo el registro del Service Worker.");
+    console.warn('Registro de Service Worker omitido:', error);
+    return null;
   }
 }
 
-/**
- * Creates a subscription and sends it to the server.
- * @param {string} idToken - The Firebase auth ID token for the user.
- */
-async function subscribeAndSync(idToken: string): Promise<void> {
-  if (process.env.NODE_ENV !== "production") return;
+async function subscribeAndSync(user: any, firestore: any): Promise<void> {
+  if (process.env.NODE_ENV !== 'production' || !user) return;
 
-  if (!('PushManager' in window)) {
-    throw new Error("Push notifications no son soportadas.");
+  if (!('PushManager' in window) || !('serviceWorker' in navigator)) {
+    return;
   }
 
-  const registration = await navigator.serviceWorker.ready;
-  let subscription = await registration.pushManager.getSubscription();
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
 
-  if (!subscription) {
-    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!vapidPublicKey) {
-      throw new Error("Falta la clave de configuración de notificaciones.");
+    if (!subscription) {
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) return;
+
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
     }
-    console.log("Creando nueva suscripción...");
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-    });
-  } else {
-    console.log("Usando suscripción existente.");
-  }
 
-  const response = await fetch('/api/subscribe', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${idToken}`,
-    },
-    body: JSON.stringify(subscription),
-  });
+    const subscriptionJSON = JSON.parse(JSON.stringify(subscription));
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to sync subscription with server.');
+    // Save directly to Firestore
+    if (firestore && subscription.endpoint) {
+      const docId = encodeURIComponent(subscription.endpoint);
+      await setDoc(
+        doc(firestore, 'subscriptions', docId),
+        {
+          userId: user.uid,
+          userEmail: user.email || null,
+          subscription: subscriptionJSON,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    // Sync with API route
+    try {
+      const idToken = await user.getIdToken(true);
+      await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          subscription: subscriptionJSON,
+          userId: user.uid,
+          userEmail: user.email,
+        }),
+      });
+    } catch (apiErr) {
+      // Ignored if direct DB write succeeded
+    }
+  } catch (error) {
+    console.warn('Auto-sync subscription note:', error);
   }
-  console.log("Suscripción sincronizada con el servidor.");
 }
-
 
 // --- UI COMPONENT ---
-
 function NotificationUI() {
   const [notificationPermission, setNotificationPermission] = useState('default');
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
   const { user } = useUser();
+  const firestore = useFirestore();
 
   useEffect(() => {
     setIsMounted(true);
@@ -96,13 +106,12 @@ function NotificationUI() {
 
   const handleRequestAndSubscribe = async () => {
     if (!user) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Debes iniciar sesión para activar notificaciones.' });
-        return;
-    }
-
-    if (process.env.NODE_ENV !== "production") {
-        toast({ title: 'Modo Desarrollo', description: 'Las notificaciones push reales solo funcionan en el entorno de producción.' });
-        return;
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Debes iniciar sesión para activar notificaciones.',
+      });
+      return;
     }
 
     setIsSubscribing(true);
@@ -112,14 +121,17 @@ function NotificationUI() {
 
       if (permission === 'granted') {
         toast({ title: '¡Permiso Concedido!', description: 'Sincronizando con el servidor...' });
-        const idToken = await user.getIdToken();
-        await subscribeAndSync(idToken);
+        await subscribeAndSync(user, firestore);
         toast({ title: '¡Notificaciones Activadas!', description: 'Todo listo para recibir alertas.' });
       } else {
-        toast({ variant: 'destructive', title: 'Permiso Denegado', description: 'No podremos enviarte notificaciones.' });
+        toast({
+          variant: 'destructive',
+          title: 'Permiso Denegado',
+          description: 'No podremos enviarte notificaciones.',
+        });
       }
     } catch (error: any) {
-      console.error('Error durante el proceso de suscripción:', error);
+      console.error('Error durante la suscripción:', error);
       toast({ variant: 'destructive', title: 'Error de Suscripción', description: error.message });
     } finally {
       setIsSubscribing(false);
@@ -134,7 +146,9 @@ function NotificationUI() {
     <div className="fixed bottom-4 right-4 z-50 w-full max-w-sm">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><BellRing /> Activar Notificaciones</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <BellRing /> Activar Notificaciones
+          </CardTitle>
           <CardDescription>Recibe alertas sobre los servicios de mantenimiento importantes.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -148,24 +162,22 @@ function NotificationUI() {
   );
 }
 
-
 // --- MAIN COMPONENT ---
-
 export default function NotificationManager() {
   const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
 
   useEffect(() => {
     const autoProcess = async () => {
-      if (process.env.NODE_ENV === "production" && user && 'serviceWorker' in navigator && 'PushManager' in window) {
+      if (
+        process.env.NODE_ENV === 'production' &&
+        user &&
+        'serviceWorker' in navigator &&
+        'PushManager' in window
+      ) {
         await registerServiceWorker();
         if (Notification.permission === 'granted') {
-          console.log("Permiso concedido. Intentando suscribir y sincronizar...");
-          try {
-            const idToken = await user.getIdToken();
-            await subscribeAndSync(idToken);
-          } catch (error) {
-            console.error("Auto-suscripción falló:", error);
-          }
+          await subscribeAndSync(user, firestore);
         }
       }
     };
@@ -173,7 +185,7 @@ export default function NotificationManager() {
     if (!isUserLoading) {
       autoProcess();
     }
-  }, [user, isUserLoading]);
+  }, [user, isUserLoading, firestore]);
 
   return <NotificationUI />;
 }

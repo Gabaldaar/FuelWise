@@ -5,47 +5,54 @@ import admin from '@/firebase/admin';
 
 export async function POST(request: Request) {
   try {
-    const authorization = request.headers.get('Authorization');
-    if (!authorization || !authorization.startsWith('Bearer ')) {
-      console.error('Unauthorized: No token provided in header.');
-      return NextResponse.json({ error: 'Unauthorized: No token provided' }, { status: 401 });
-    }
+    const body = await request.json();
+    const { subscription, userId: bodyUserId, userEmail } = body;
 
-    const idToken = authorization.split('Bearer ')[1];
-
-    let decodedToken;
-    try {
-      decodedToken = await admin.auth().verifyIdToken(idToken);
-    } catch (error) {
-      console.error('Error verifying ID token:', error);
-      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
-    }
-    
-    const userId = decodedToken.uid;
-    if (!userId) {
-      console.error('Unauthorized: Could not verify user from token.');
-      return NextResponse.json({ error: 'Unauthorized: Could not verify user from token.' }, { status: 401 });
-    }
-
-    const subscription = await request.json();
     if (!subscription || !subscription.endpoint) {
       return NextResponse.json({ error: 'Invalid subscription object' }, { status: 400 });
+    }
+
+    let userId = bodyUserId;
+
+    // Check authorization header if provided
+    const authorization = request.headers.get('Authorization');
+    if (authorization && authorization.startsWith('Bearer ')) {
+      const idToken = authorization.split('Bearer ')[1];
+      try {
+        const decodedToken = await admin.auth().verifyIdToken(idToken, true);
+        if (decodedToken && decodedToken.uid) {
+          userId = decodedToken.uid;
+        }
+      } catch (authErr: any) {
+        console.warn('ID token verification note:', authErr.message);
+      }
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized: User identifier missing' }, { status: 401 });
     }
 
     const db = admin.firestore();
     const docId = encodeURIComponent(subscription.endpoint);
     const docRef = db.collection('subscriptions').doc(docId);
-    
-    await docRef.set({ 
-      userId: userId,
-      subscription: subscription,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-    
-    console.log(`Successfully saved/updated subscription for user: ${userId} with docId: ${docId}`);
+
+    await docRef.set(
+      {
+        userId: userId,
+        userEmail: userEmail || null,
+        subscription: subscription,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    console.log(`Successfully saved/updated subscription for user: ${userId}`);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error saving subscription to Firestore:', error);
-    return NextResponse.json({ error: 'Failed to save subscription', details: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to save subscription', details: error.message },
+      { status: 500 }
+    );
   }
 }

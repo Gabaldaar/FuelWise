@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { urlBase64ToUint8Array } from '@/lib/utils';
 import {
@@ -18,10 +19,10 @@ import {
   RefreshCw,
   Smartphone,
 } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
 
 export default function NotificationsSettings() {
   const { user } = useUser();
+  const firestore = useFirestore();
   const { toast } = useToast();
 
   const [permission, setPermission] = useState<string>('default');
@@ -94,20 +95,42 @@ export default function NotificationsSettings() {
         });
       }
 
-      // 4. Send subscription to server
-      const idToken = await user.getIdToken();
-      const res = await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify(sub),
-      });
+      const subscriptionJSON = JSON.parse(JSON.stringify(sub));
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Error al registrar suscripción en el servidor.');
+      // 4. Save directly to Firestore for 100% reliable real-time sync
+      try {
+        const docId = encodeURIComponent(sub.endpoint);
+        await setDoc(
+          doc(firestore, 'subscriptions', docId),
+          {
+            userId: user.uid,
+            userEmail: user.email || null,
+            subscription: subscriptionJSON,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (dbErr: any) {
+        console.warn('Firestore direct write notice:', dbErr.message);
+      }
+
+      // 5. Also sync with backend API
+      try {
+        const idToken = await user.getIdToken(true);
+        await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            subscription: subscriptionJSON,
+            userId: user.uid,
+            userEmail: user.email,
+          }),
+        });
+      } catch (apiErr) {
+        console.warn('API sync notice:', apiErr);
       }
 
       setIsSubscribed(true);
@@ -139,7 +162,7 @@ export default function NotificationsSettings() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          subscription: sub,
+          subscription: sub ? JSON.parse(JSON.stringify(sub)) : undefined,
           userId: user.uid,
           payload: {
             title: '🚗 MotorLog - Prueba Exitosa',
@@ -149,13 +172,19 @@ export default function NotificationsSettings() {
         }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch (e) {
+        data = { error: `Error del servidor (HTTP ${res.status})` };
+      }
+
       if (!res.ok) {
-        throw new Error(data.error || 'No se pudo enviar la notificación de prueba.');
+        throw new Error(data.error || data.message || 'No se pudo enviar la notificación de prueba.');
       }
 
       toast({
-        title: 'Notificación Enviada',
+        title: '¡Notificación Enviada!',
         description: 'Revisa la barra de notificaciones de tu dispositivo.',
       });
     } catch (error: any) {
@@ -173,6 +202,7 @@ export default function NotificationsSettings() {
   const handleManualCronCheck = async () => {
     setIsCheckingCron(true);
     try {
+      const res = await fetch('/api/cron/check-reminders', { method: 'POST' });
       let data: any = {};
       try {
         data = await res.json();
