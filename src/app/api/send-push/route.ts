@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import webpush from 'web-push';
 import type { PushSubscription } from 'web-push';
-import admin from '@/firebase/admin';
+import { adminDb } from '@/firebase/admin';
 
 function initVapid() {
   const publicKey =
@@ -20,7 +20,6 @@ function initVapid() {
 export async function POST(request: Request) {
   try {
     initVapid();
-    const db = admin.firestore();
 
     const body = await request.json();
     const { subscription, userId, payload } = body as {
@@ -58,7 +57,7 @@ export async function POST(request: Request) {
 
     // Case 2: Target userId provided - fetch all subscriptions for this user
     if (userId) {
-      const subscriptionsSnapshot = await db
+      const subscriptionsSnapshot = await adminDb
         .collection('subscriptions')
         .where('userId', '==', userId)
         .get();

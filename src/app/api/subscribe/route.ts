@@ -1,7 +1,7 @@
 'use server';
 
 import { NextResponse } from 'next/server';
-import admin from '@/firebase/admin';
+import { adminDb, adminAuth, FieldValue } from '@/firebase/admin';
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     if (authorization && authorization.startsWith('Bearer ')) {
       const idToken = authorization.split('Bearer ')[1];
       try {
-        const decodedToken = await admin.auth().verifyIdToken(idToken, true);
+        const decodedToken = await adminAuth.verifyIdToken(idToken, true);
         if (decodedToken && decodedToken.uid) {
           userId = decodedToken.uid;
         }
@@ -32,16 +32,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized: User identifier missing' }, { status: 401 });
     }
 
-    const db = admin.firestore();
     const docId = encodeURIComponent(subscription.endpoint);
-    const docRef = db.collection('subscriptions').doc(docId);
+    const docRef = adminDb.collection('subscriptions').doc(docId);
 
     await docRef.set(
       {
         userId: userId,
         userEmail: userEmail || null,
         subscription: subscription,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );

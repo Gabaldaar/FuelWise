@@ -1,7 +1,7 @@
 'use server';
 
 import { NextResponse } from 'next/server';
-import admin from '@/firebase/admin';
+import { adminDb } from '@/firebase/admin';
 import webpush from 'web-push';
 import { differenceInHours } from 'date-fns';
 
@@ -29,13 +29,12 @@ async function handleCheckReminders() {
   try {
     initVapid();
 
-    const db = admin.firestore();
     const now = new Date();
     const upcomingThreshold = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days in advance
     const NOTIFICATION_COOLDOWN_HOURS = 24;
 
     // 1. Fetch all subscriptions from Firestore
-    const subscriptionsSnapshot = await db.collection('subscriptions').get();
+    const subscriptionsSnapshot = await adminDb.collection('subscriptions').get();
     if (subscriptionsSnapshot.empty) {
       return NextResponse.json({
         success: true,
@@ -52,7 +51,7 @@ async function handleCheckReminders() {
     }));
 
     // 2. Fetch all vehicles
-    const vehiclesSnapshot = await db.collection('vehicles').get();
+    const vehiclesSnapshot = await adminDb.collection('vehicles').get();
     let totalRemindersChecked = 0;
     let alertsSent = 0;
 
@@ -62,7 +61,7 @@ async function handleCheckReminders() {
       const vehicleName = `${vehicleData.make || ''} ${vehicleData.model || ''} (${vehicleData.plate || ''})`.trim();
 
       // Find current latest odometer from fuel_records
-      const lastFuelSnap = await db
+      const lastFuelSnap = await adminDb
         .collection('vehicles')
         .doc(vehicleId)
         .collection('fuel_records')
@@ -73,7 +72,7 @@ async function handleCheckReminders() {
       const currentOdometer = lastFuelSnap.empty ? 0 : lastFuelSnap.docs[0].data().odometer || 0;
 
       // Find incomplete service reminders
-      const remindersSnap = await db
+      const remindersSnap = await adminDb
         .collection('vehicles')
         .doc(vehicleId)
         .collection('service_reminders')
@@ -131,7 +130,7 @@ async function handleCheckReminders() {
             } catch (err: any) {
               if (err.statusCode === 410 || err.statusCode === 404) {
                 console.log(`Deleting expired subscription: ${subItem.docId}`);
-                await db.collection('subscriptions').doc(subItem.docId).delete().catch(() => {});
+                await adminDb.collection('subscriptions').doc(subItem.docId).delete().catch(() => {});
               }
             }
           }
