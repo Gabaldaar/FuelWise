@@ -5,8 +5,6 @@ import admin from '@/firebase/admin';
 import webpush from 'web-push';
 import { differenceInHours } from 'date-fns';
 
-const db = admin.firestore();
-
 function initVapid() {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -31,6 +29,7 @@ async function handleCheckReminders() {
   try {
     initVapid();
 
+    const db = admin.firestore();
     const now = new Date();
     const upcomingThreshold = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days in advance
     const NOTIFICATION_COOLDOWN_HOURS = 24;
@@ -40,8 +39,9 @@ async function handleCheckReminders() {
     if (subscriptionsSnapshot.empty) {
       return NextResponse.json({
         success: true,
-        message: 'No active push subscriptions found.',
+        message: 'No hay dispositivos suscritos para recibir notificaciones.',
         alertsSent: 0,
+        totalRemindersChecked: 0,
       });
     }
 
@@ -146,14 +146,14 @@ async function handleCheckReminders() {
 
     return NextResponse.json({
       success: true,
-      message: `Revisión completada. Se evaluaron ${totalRemindersChecked} recordatorios y se enviaron ${alertsSent} alertas.`,
+      message: `Revisión completada. Se evaluaron ${totalRemindersChecked} recordatorios y se enviaron ${alertsSent} alertas a los dispositivos suscritos.`,
       totalRemindersChecked,
       alertsSent,
     });
   } catch (error: any) {
     console.error('Error in /api/cron/check-reminders:', error);
     return NextResponse.json(
-      { error: 'Error checking reminders', details: error.message },
+      { error: 'Error al verificar recordatorios', details: error.message },
       { status: 500 }
     );
   }

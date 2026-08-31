@@ -5,8 +5,6 @@ import webpush from 'web-push';
 import type { PushSubscription } from 'web-push';
 import admin from '@/firebase/admin';
 
-const db = admin.firestore();
-
 function initVapid() {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -22,6 +20,7 @@ function initVapid() {
 export async function POST(request: Request) {
   try {
     initVapid();
+    const db = admin.firestore();
 
     const body = await request.json();
     const { subscription, userId, payload } = body as {
@@ -84,7 +83,7 @@ export async function POST(request: Request) {
           // If subscription is expired or unsubscribed, remove from Firestore
           if (err.statusCode === 410 || err.statusCode === 404) {
             console.log(`Removing expired subscription: ${docSnap.id}`);
-            await docSnap.ref.delete();
+            await docSnap.ref.delete().catch(() => {});
           } else {
             console.error(`Error sending push to subscription ${docSnap.id}:`, err);
           }

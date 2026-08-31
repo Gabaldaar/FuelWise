@@ -1,29 +1,31 @@
 import admin from 'firebase-admin';
 
-// This structure prevents re-initialization of the Firebase Admin SDK in serverless environments.
-// It ensures that `admin.initializeApp` is called only once per container instance.
+// Explicitly set the project ID to avoid auto-discovery missing project ID errors in Cloud Run
+const projectId =
+  process.env.FIREBASE_PROJECT_ID ||
+  process.env.GCLOUD_PROJECT ||
+  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+  'studio-1769907004-5fad3';
 
 if (!admin.apps.length) {
   try {
-    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
-      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-      : undefined;
-
-    if (serviceAccount) {
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (serviceAccountString) {
+      const serviceAccount = JSON.parse(serviceAccountString);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
+        projectId: serviceAccount.project_id || projectId,
       });
       console.log('[Firebase Admin] Initialized successfully via service account key.');
     } else {
-      // This is for environments like Google Cloud Run where service account is auto-discovered.
-      admin.initializeApp();
-      console.log('[Firebase Admin] Initialized successfully via auto-discovery.');
+      admin.initializeApp({
+        projectId: projectId,
+      });
+      console.log('[Firebase Admin] Initialized successfully via project ID:', projectId);
     }
   } catch (error: any) {
-    console.error('[Firebase Admin] Initialization failed:', error.message);
-    // This will cause subsequent DB operations to fail, making the error visible.
+    console.error('[Firebase Admin] Initialization error:', error.message);
   }
 }
 
-// Export the initialized admin instance.
 export default admin;

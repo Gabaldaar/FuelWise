@@ -173,11 +173,15 @@ export default function NotificationsSettings() {
   const handleManualCronCheck = async () => {
     setIsCheckingCron(true);
     try {
-      const res = await fetch('/api/cron/check-reminders', { method: 'POST' });
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch (e) {
+        data = { error: `Error del servidor (HTTP ${res.status})` };
+      }
 
       if (!res.ok) {
-        throw new Error(data.error || 'Error al ejecutar verificación.');
+        throw new Error(data.error || data.details || 'Error al ejecutar verificación.');
       }
 
       toast({

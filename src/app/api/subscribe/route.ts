@@ -1,51 +1,46 @@
 'use server';
 
 import { NextResponse } from 'next/server';
-import admin from '@/firebase/admin'; // Import the centralized admin instance
-
-// Use the initialized admin instance. Do not initialize here.
-const db = admin.firestore();
+import admin from '@/firebase/admin';
 
 export async function POST(request: Request) {
-  const authorization = request.headers.get('Authorization');
-  if (!authorization || !authorization.startsWith('Bearer ')) {
-    console.error('Unauthorized: No token provided in header.');
-    return NextResponse.json({ error: 'Unauthorized: No token provided' }, { status: 401 });
-  }
-
-  const idToken = authorization.split('Bearer ')[1];
-
-  let decodedToken;
   try {
-    // Verify the token using the Admin SDK
-    decodedToken = await admin.auth().verifyIdToken(idToken);
-  } catch (error) {
-    console.error('Error verifying ID token:', error);
-    return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
-  }
-  
-  const userId = decodedToken.uid;
-  
-  if (!userId) {
-     console.error('Unauthorized: Could not verify user from token.');
-     return NextResponse.json({ error: 'Unauthorized: Could not verify user from token.' }, { status: 401 });
-  }
+    const authorization = request.headers.get('Authorization');
+    if (!authorization || !authorization.startsWith('Bearer ')) {
+      console.error('Unauthorized: No token provided in header.');
+      return NextResponse.json({ error: 'Unauthorized: No token provided' }, { status: 401 });
+    }
 
-  try {
+    const idToken = authorization.split('Bearer ')[1];
+
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(idToken);
+    } catch (error) {
+      console.error('Error verifying ID token:', error);
+      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+    }
+    
+    const userId = decodedToken.uid;
+    if (!userId) {
+      console.error('Unauthorized: Could not verify user from token.');
+      return NextResponse.json({ error: 'Unauthorized: Could not verify user from token.' }, { status: 401 });
+    }
+
     const subscription = await request.json();
     if (!subscription || !subscription.endpoint) {
       return NextResponse.json({ error: 'Invalid subscription object' }, { status: 400 });
     }
 
-    // Use a URL-safe, encoded version of the endpoint as the document ID to prevent duplicates.
+    const db = admin.firestore();
     const docId = encodeURIComponent(subscription.endpoint);
     const docRef = db.collection('subscriptions').doc(docId);
     
     await docRef.set({ 
-        userId: userId,
-        subscription: subscription,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }); // Use merge: true to create or update
+      userId: userId,
+      subscription: subscription,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
     
     console.log(`Successfully saved/updated subscription for user: ${userId} with docId: ${docId}`);
     return NextResponse.json({ success: true });
