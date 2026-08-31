@@ -10,8 +10,9 @@
 /.next/
 /out/
 
-# firebase build cache
-.firebase/
+# Backups
+Backups/
+Nueva carpeta/
 
 # build cache
 .next/cache/
